@@ -14,6 +14,16 @@ The Twitter-based influence operation marks the first time the Chinese Communist
 
 This post uses Natural Language Processing (NLP) techniques and tweet and account information of over 23,000 distinct accounts captured by Twitters Public Safety team to identify and examine the effectiveness of China’s Twitter-based influence operations.  
 
+### Data
+
+Twitter has published data (User Accounts and Tweets) of state-backed entities flagged for attempting to manipulate Twitter – Through Influencing Elections And/or Other Civic Conversations​
+
+Distinct Tweets: 348,607
+
+Distinct Accounts: 23,749 
+
+Languages: 20+
+
 
 
 ### Results
