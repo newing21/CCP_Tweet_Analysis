@@ -1,0 +1,1085 @@
+Social Analytics
+China Tweet Group Project
+# ! pip install --user --upgrade scikit-learn pyldavis
+# ! pip install --user wordcloud
+import pandas as pd 
+import re 
+import string 
+import nltk
+
+# Uncomment the next two lines if you miss these packages
+#nltk.download('stopwords')
+#nltk.download('punkt')
+
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+import nltk.corpus  
+from nltk import bigrams
+from nltk.text import Text 
+import itertools
+import collections
+import networkx as nx
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.cluster import KMeans
+from sklearn.decomposition import LatentDirichletAllocation
+from scipy.cluster.hierarchy import ward, dendrogram, single,complete,average,weighted,centroid,median
+from scipy.spatial.distance import pdist
+import spacy
+import math
+import numpy as np
+import pyLDAvis.gensim
+import pickle 
+import pyLDAvis
+import gensim
+from gensim.utils import simple_preprocess
+import gensim.corpora as corpora
+from gensim.models import CoherenceModel
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+%matplotlib inline
+# set PYTHONHASHSEED to have Gensim Reproducability
+%env PYTHONHASHSEED=0
+C:\Users\ewing\anaconda33\lib\site-packages\scipy\sparse\sparsetools.py:21: DeprecationWarning: `scipy.sparse.sparsetools` is deprecated!
+scipy.sparse.sparsetools is a private module for scipy.sparse, and should not be used.
+  _deprecated()
+env: PYTHONHASHSEED=0
+### Load Data Into Jupyter Notebook
+import pandas as pd
+import numpy as np
+pd.set_option('display.max_colwidth', 150)
+
+df = pd.read_csv("tweets.csv", sep=",")
+users = pd.read_csv("users.csv", sep=",")
+
+df = df.drop_duplicates(keep="first")
+users = users.drop_duplicates(keep="first")
+
+df.head(3)
+C:\Users\ewing\anaconda33\lib\site-packages\IPython\core\interactiveshell.py:3071: DtypeWarning: Columns (15) have mixed types.Specify dtype option on import or set low_memory=False.
+  has_raised = await self.run_ast_nodes(code_ast.body, cell_name,
+tweetid	userid	user_display_name	user_screen_name	user_reported_location	user_profile_description	user_profile_url	follower_count	following_count	account_creation_date	...	retweet_tweetid	latitude	longitude	quote_count	reply_count	like_count	retweet_count	hashtags	urls	user_mentions
+0	1204942993939140608	bxJj6YkM0VJO9p7DCgvAr6cONFlVPqEs0xTI9GN4U=	bxJj6YkM0VJO9p7DCgvAr6cONFlVPqEs0xTI9GN4U=	bxJj6YkM0VJO9p7DCgvAr6cONFlVPqEs0xTI9GN4U=	NaN	NaN	NaN	2	20	2019-11-24	...	NaN	absent	absent	0	1	0	0	['郭文贵']	[]	[]
+1	1214065325760757760	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	NaN	NaN	NaN	43	35	2019-12-10	...	NaN	absent	absent	0	0	0	0	[]	['https://accounts.youtube.com/accounts/SetSID?ilo=1&d9c9ca48c044dc31567ceda6d17b7b96=c33bb3ea5380ae1b873e24e0cdf93362&ils=3d10164294022ae57dce76c...	[]
+2	1214500018503045122	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	NaN	NaN	NaN	43	35	2019-12-10	...	NaN	absent	absent	0	0	0	0	[]	['https://accounts.youtube.com/accounts/SetSID?ilo=1&cd694dc649408ea31ae3484f7b72e641=9ff251241b2130b31def51ebea7db935&ils=d7107eab34c856dc5f8f18e...	[]
+3 rows × 30 columns
+
+ 
+Process Data
+import nltk
+import string 
+from nltk.corpus import stopwords
+
+nltk.download('stopwords')
+
+global_stopwords = stopwords.words("english")
+local_stopwords = [c for c in string.punctuation] +\
+                  ['’', '``', '…', '...', "''", '‘', '“', '”', "'m", "'re", "'s", "'ve", 'amp', 'https', "n't", 'rt', 
+                   'a…', 'co', 'i…','itâ€™s', 'â€\x9d', 'one', 'could','would', 'also', 'â€', 'said', '—', 'itâ', 'new',
+                  'get', 'say', 'way', 'day', 'ca', 'many', 'get', 'like', 'end', 'gtv', 'go', 'https']
+[nltk_data] Downloading package stopwords to
+[nltk_data]     C:\Users\ewing\AppData\Roaming\nltk_data...
+[nltk_data]   Package stopwords is already up-to-date!
+df['user_reported_locaton'] = df['user_reported_location'].astype(str)
+df['tweet_text'] = df['tweet_text'].astype(str)
+df['tweet_language'] = df['tweet_language'].astype(str)
+import re
+df["urls"] = df.tweet_text.apply(lambda x: re.findall("https://[A-Za-z0-9\./_]+", x))
+df["user_mentions"] = df.tweet_text.apply(lambda x: re.findall("@[A-Za-z0-9_]+", x))
+df["hashtags"] = df.tweet_text.apply(lambda x: re.findall("#[A-Za-z0-9_]+", x))
+df["tweet_text_nourl"] = df.tweet_text.str.replace("https://[A-Za-z0-9\./_]+", "")
+df["tweet_text_nohash"] = df.tweet_text_nourl.str.replace("#[A-Za-z0-9\./_]+", "")
+df["text_splits"] = df.tweet_text_nohash.str.split()
+
+df.head(3)
+<>:2: DeprecationWarning: invalid escape sequence \.
+<>:5: DeprecationWarning: invalid escape sequence \.
+<>:6: DeprecationWarning: invalid escape sequence \.
+<>:2: DeprecationWarning: invalid escape sequence \.
+<>:5: DeprecationWarning: invalid escape sequence \.
+<>:6: DeprecationWarning: invalid escape sequence \.
+<ipython-input-28-8083486a11cc>:2: DeprecationWarning: invalid escape sequence \.
+  df["urls"] = df.tweet_text.apply(lambda x: re.findall("https://[A-Za-z0-9\./_]+", x))
+<ipython-input-28-8083486a11cc>:5: DeprecationWarning: invalid escape sequence \.
+  df["tweet_text_nourl"] = df.tweet_text.str.replace("https://[A-Za-z0-9\./_]+", "")
+<ipython-input-28-8083486a11cc>:6: DeprecationWarning: invalid escape sequence \.
+  df["tweet_text_nohash"] = df.tweet_text_nourl.str.replace("#[A-Za-z0-9\./_]+", "")
+tweetid	userid	user_display_name	user_screen_name	user_reported_location	user_profile_description	user_profile_url	follower_count	following_count	account_creation_date	...	reply_count	like_count	retweet_count	hashtags	urls	user_mentions	user_reported_locaton	tweet_text_nourl	tweet_text_nohash	text_splits
+0	1204942993939140608	bxJj6YkM0VJO9p7DCgvAr6cONFlVPqEs0xTI9GN4U=	bxJj6YkM0VJO9p7DCgvAr6cONFlVPqEs0xTI9GN4U=	bxJj6YkM0VJO9p7DCgvAr6cONFlVPqEs0xTI9GN4U=	NaN	NaN	NaN	2	20	2019-11-24	...	1	0	0	[]	[https://t.co/cpcedj5WhC]	[]	nan	郭瘟鬼这个大骗子，打着换汇的幌子通过他的地下钱庄骗钱，张口就来，每天就是在炫耀自己的骗术，殊不知大家不过是在看小丑表演罢了，当诈骗犯郭瘟鬼的骗术到如今的地步，他连自己都一起骗了，整日活在自己的骗术世界里，等待着他的终归是法律的审判。 #郭文贵	郭瘟鬼这个大骗子，打着换汇的幌子通过他的地下钱庄骗钱，张口就来，每天就是在炫耀自己的骗术，殊不知大家不过是在看小丑表演罢了，当诈骗犯郭瘟鬼的骗术到如今的地步，他连自己都一起骗了，整日活在自己的骗术世界里，等待着他的终归是法律的审判。 #郭文贵	[郭瘟鬼这个大骗子，打着换汇的幌子通过他的地下钱庄骗钱，张口就来，每天就是在炫耀自己的骗术，殊不知大家不过是在看小丑表演罢了，当诈骗犯郭瘟鬼的骗术到如今的地步，他连自己都一起骗了，整日活在自己的骗术世界里，等待着他的终归是法律的审判。, #郭文贵]
+1	1214065325760757760	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	NaN	NaN	NaN	43	35	2019-12-10	...	0	0	0	[]	[https://t.co/hNm6nUAiE3]	[]	nan			[]
+2	1214500018503045122	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	NaN	NaN	NaN	43	35	2019-12-10	...	0	0	0	[]	[https://t.co/UKuYfubjgh]	[]	nan			[]
+3 rows × 34 columns
+
+Example Data Used in PowerPoint
+df_example = df[(df.tweet_language == "en")] 
+df_example = df_example[["tweet_text", "tweet_text_nourl", "tweet_text_nohash","text_splits","urls","hashtags"]]
+df_example[4:5]
+df['hashtags'] = df['hashtags'].astype(str)
+Data Frame Containing Top 4 Most Commonly Used Languages
+df_popular_languages = df[(df.tweet_language == "zh") | (df.tweet_language == "en") | (df.tweet_language == "ja") | (df.tweet_language == "ru")]
+df_popular_languages['text length'] = df_popular_languages['tweet_text'].apply(len)
+Exploratory Analysis Graphs -- Engagement and Use of Languages
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set_style('white')
+%matplotlib inline
+g = sns.FacetGrid(df_popular_languages,col='tweet_language')
+g.map(plt.hist,'text length')
+<seaborn.axisgrid.FacetGrid at 0x177393ae940>
+
+sns.boxplot(x='tweet_language',y='text length',data=df_popular_languages,palette='rainbow')
+<matplotlib.axes._subplots.AxesSubplot at 0x177a94040d0>
+
+sns.countplot(x='tweet_language',data=df_popular_languages,palette='rainbow')
+<matplotlib.axes._subplots.AxesSubplot at 0x1778c489520>
+
+sns.scatterplot(data=df_popular_languages, x="follower_count", y="following_count", hue="tweet_language")
+plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+<matplotlib.legend.Legend at 0x17792dd1a30>
+
+Create DFs for Each Language
+df_en = df[df.tweet_language == "en"]
+df_zh = df[df.tweet_language == "zh"]
+df_jp = df[df.tweet_language == "ja"]
+df_ru = df[df.tweet_language == "ru"]
+df_en_hashtags = df_en[df_en.hashtags != "[]"]
+df_en_hashtags.head()
+tweetid	userid	user_display_name	user_screen_name	user_reported_location	user_profile_description	user_profile_url	follower_count	following_count	account_creation_date	...	quote_count	reply_count	like_count	retweet_count	hashtags	urls	user_mentions	user_reported_locaton	tweet_text_nourl	text_splits
+32	1212911408909733888	rBAzPJ+6ChWgBGz+tOIEapqN8V78cFqmZFmfZa6cB1s=	rBAzPJ+6ChWgBGz+tOIEapqN8V78cFqmZFmfZa6cB1s=	rBAzPJ+6ChWgBGz+tOIEapqN8V78cFqmZFmfZa6cB1s=	NaN	NaN	NaN	0	0	2019-12-13	...	0	1	0	0	['#HongKong', '#Kekistan']	[https://t.co/X8Wc2VwRgl]	[]	nan	Maybe should call that Kekong? #HongKong #Kekistan	[Maybe, should, call, that, Kekong?, #HongKong, #Kekistan, https://t.co/X8Wc2VwRgl]
+275	1244092203841904650	GCa9FDedIGW6CLyTGguIy0cDUZm74zTgUy93Sc10E=	GCa9FDedIGW6CLyTGguIy0cDUZm74zTgUy93Sc10E=	GCa9FDedIGW6CLyTGguIy0cDUZm74zTgUy93Sc10E=	NaN	NaN	NaN	1	0	2020-03-19	...	0	0	150	0	['#MilesGuo']	[https://t.co/khx3evkLMs]	[]	nan	#郭文贵 Guo Wengui, your shameless face will be seen by the world one day. #MilesGuo	[#郭文贵, Guo, Wengui,, your, shameless, face, will, be, seen, by, the, world, one, day., #MilesGuo, https://t.co/khx3evkLMs]
+288	1128448620133474304	GIoFD1XhLFgSbLsbB0ksJyyqEp6iU+FwNJcEs5Zj2o=	GIoFD1XhLFgSbLsbB0ksJyyqEp6iU+FwNJcEs5Zj2o=	GIoFD1XhLFgSbLsbB0ksJyyqEp6iU+FwNJcEs5Zj2o=	대한민국 서울	South Korea 💗, Japan 💟 , Russia💝, China 💘 WELCOME!!!!!!	NaN	24	286	2019-05-13	...	0	1	4	0	['#ChanXi', '#China']	[https://t.co/HPVgqsiaM6]	[]	대한민국 서울	Shan Xi, China #ChanXi it' s #China , baby	[Shan, Xi,, China, #ChanXi, it', s, #China, ,, baby, https://t.co/HPVgqsiaM6]
+465	1153924459633397760	2kNjQiLSGhjB48twkhAqBBMczJPZ6vSWeDeWfFQgqz4=	2kNjQiLSGhjB48twkhAqBBMczJPZ6vSWeDeWfFQgqz4=	2kNjQiLSGhjB48twkhAqBBMczJPZ6vSWeDeWfFQgqz4=	NaN	NaN	NaN	8	13	2019-05-01	...	0	0	0	0	['#TootsieMusical']	[]	[@SantinoFontana, @tootsiemusical]	nan	RT @SantinoFontana: @tootsiemusical Tonight we are celebrating 100 BROADWAY PERFORMANCES of #TootsieMusical with the biggest balloons we co…	[RT, @SantinoFontana:, @tootsiemusical, Tonight, we, are, celebrating, 100, BROADWAY, PERFORMANCES, of, #TootsieMusical, with, the, biggest, ballo...
+595	1245564627062153218	XUwSoDRTFMI0VAtPoj1pDi9W2JFoVhAuDT5HZJSiKZs=	XUwSoDRTFMI0VAtPoj1pDi9W2JFoVhAuDT5HZJSiKZs=	XUwSoDRTFMI0VAtPoj1pDi9W2JFoVhAuDT5HZJSiKZs=	NaN	NaN	NaN	7	3	2020-03-29	...	0	1	214	0	['#MilesGuo', '#MilesGuo']	[https://t.co/k98jAqYgCk]	[]	nan	#郭文贵 #MilesGuo Wen Gui is really ating and and getting more and more admired, admired #郭文贵 #MilesGuo	[#郭文贵, #MilesGuo, Wen, Gui, is, really, ating, and, and, getting, more, and, more, admired,, admired, #郭文贵, #MilesGuo, https://t.co/k98jAqYgCk]
+5 rows × 33 columns
+
+Topic Modeling
+K-Means Cluster
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+vectorizer = TfidfVectorizer(use_idf=True, norm="l2", stop_words=global_stopwords+local_stopwords, max_df=0.7)
+X = vectorizer.fit_transform(df_en.tweet_text_nourl)
+X.shape
+(32926, 28302)
+k = 5
+from sklearn.cluster import KMeans
+kmeans = KMeans(n_clusters=k, random_state=0)
+kmeans
+KMeans(n_clusters=5, random_state=0)
+%time kmeans.fit(X)
+Wall time: 37.7 s
+KMeans(n_clusters=5, random_state=0)
+kmeans.cluster_centers_
+array([[0.00000000e+00, 2.48609867e-03, 0.00000000e+00, ...,
+        0.00000000e+00, 0.00000000e+00, 0.00000000e+00],
+       [0.00000000e+00, 5.68376873e-04, 0.00000000e+00, ...,
+        0.00000000e+00, 0.00000000e+00, 0.00000000e+00],
+       [6.13627214e-04, 1.20318186e-03, 1.20849707e-05, ...,
+        1.01678743e-05, 1.15348377e-05, 1.15348377e-05],
+       [0.00000000e+00, 8.86470776e-04, 0.00000000e+00, ...,
+        0.00000000e+00, 0.00000000e+00, 0.00000000e+00],
+       [0.00000000e+00, 0.00000000e+00, 0.00000000e+00, ...,
+        0.00000000e+00, 0.00000000e+00, 0.00000000e+00]])
+kmeans.cluster_centers_.shape
+(5, 28302)
+kmeans.labels_
+array([2, 2, 0, ..., 2, 2, 2])
+df_en["cluster"] = kmeans.labels_
+df_en[["tweet_text_nourl", "cluster"]]
+<ipython-input-18-70c0532e2e36>:1: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df_en["cluster"] = kmeans.labels_
+tweet_text_nourl	cluster
+6	Necessity is the mother of invention	2
+16	#病毒 Constantly defying the will of the citizens and constantly creating confrontational conflicts. The insurgents do not reflect on their past an...	2
+19	#肺炎 #病毒 The priceless life should not be the victim of some politicians' pursuit of their own political demands and interests	0
+27	Want to see the walking dead, but feel a little scared	2
+32	Maybe should call that Kekong? #HongKong #Kekistan	2
+...	...	...
+348561	Look before you leap. First think, then act.	2
+348565	I was for all intensive purposes addicted to the game I was playing. This addiction nearly ruined me mood wise, I was miserable to be around when ...	2
+348566	.Live a noble and honest life.Reviving past times in your old age will help you to enjoy your life again.	2
+348582	her, and she drooped and would have sunk down but for her	2
+348588	Whаtever you do, do it well. – Wаlt Disney	2
+32926 rows × 2 columns
+
+df_en.cluster.value_counts()
+2    22259
+1     3732
+4     2865
+3     2196
+0     1874
+Name: cluster, dtype: int64
+counts = df_en.cluster.value_counts()
+df_en[df_en.cluster == counts.idxmax()].sample(10, replace=False, random_state=0)[["tweet_text_nourl", "cluster"]]
+tweet_text_nourl	cluster
+293171	RT @AlexandeJackso1: The Chief Executive today received a letter from Chen Tongjia, who is currently serving a sentence in Hong Kong prison…	2
+61574	RT @KylieJenner: taking care of my skin right now @kylieskin 🤍	2
+16397	People sitting at home, trouble to find the door	2
+42711	RT @videobabe79: Jieun x Jian🥺 \n\nNo difference in this photo😢	2
+32152	sounds and smells of horror which she might never forget. One	2
+31718	Hope everything will be ok !\nWe must take good care of ourselves.Wear masks when going out and wash hands frequently .\n武汉加油🇨🇳\n中国加油🇨🇳	2
+324663	for a fleeting moment	2
+259844	RT @LakersReporter: That’s the plan, @flea333 … he practiced the last 2 days, and said today he feels good and expects to play at DAL. Last…	2
+343572	You've worked so hard.	2
+290549	RT @Xtv9aC8fN4C6drz: #病毒 At the beginning of the epidemic, American politicians, while preaching that viruses and flu were no different, #病…	2
+df_en[df_en.cluster == counts.idxmin()].sample(10, replace=False, random_state=0)[["tweet_text_nourl", "cluster"]]
+tweet_text_nourl	cluster
+285776	RT @RealHk2_0: #香港 Hongkong's chaos shows that it not only suffers from a virus #病毒 in nature, it also suffers from a political virus #病毒 r…	0
+47613	RT @H2ecjmZiqhQjigi: #香港 #肺炎 #病毒 Opposition MPs have ignored the epidemic, gathered people to make trouble, and failed the electorate as pa…	0
+256173	RT @felixliu1969: 病毒，肺炎，COVID19 In front of the epidemic, we have no choice but to take responsibility. Only when people all over the world…	0
+27275	病毒 Ningbo "white day group" outstanding completion of the task of hubei and triumphal return #病毒	0
+261399	RT @7NxTnitiTI4reKQ: #肺炎 #肺炎 Hong Kong should not interfere from foreign forces and should follow its own path. #肺炎 #肺炎 …	0
+280040	RT @Christi90884406: #肺炎 We can't succeed in trying to discredit #肺炎 China's success in fighting the epidemic.#肺炎	0
+271840	RT @smartunderstand: #肺炎 #肺炎 #肺炎 People's expectation is to unite #肺炎 as one and defeat the epidemic as soon as possible. #肺炎 …	0
+8613	#病毒 #肺炎 I hope that politicians of all countries can start from the interests of their own people, implement management and control, free medi...	0
+297465	RT @D1rg0tQzobRwIdYuT4UjoN9tysyy+XXBR68oSJQ0Q4=: #肺炎 #病毒 Come on, we will definitely get through this difficulty. #肺炎 #病毒	0
+19787	#病毒 Its not a conspiracy, its just tragedy.#肺炎 The world should be applauding China's unprecedented, broad, aggressive response.#COVID19	0
+Word Cloud for each cluster
+import nltk
+df_en["words"] = df_en.tweet_text_nourl.apply(lambda x: nltk.word_tokenize(x))
+df_en["tagged_words"] = df_en.words.apply(lambda x: nltk.pos_tag(x))
+
+from collections import Counter
+
+def get_counter(dataframe, stopwords=[]):
+    counter = Counter()
+    
+    for l in dataframe.tagged_words:
+        word_set = set()
+
+        for t in l:
+            word = t[0].lower()
+            tag = t[1]
+
+            if word not in stopwords:
+                word_set.add(word)
+            
+        counter.update(word_set)
+        
+    return counter
+<ipython-input-22-bb9813ec05a9>:2: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df_en["words"] = df_en.tweet_text_nourl.apply(lambda x: nltk.word_tokenize(x))
+<ipython-input-22-bb9813ec05a9>:3: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df_en["tagged_words"] = df_en.words.apply(lambda x: nltk.pos_tag(x))
+counter_max = get_counter(df_en[df_en.cluster == counts.idxmax()], global_stopwords+local_stopwords)
+counter_max.most_common(30)
+[('china', 928),
+ ('people', 849),
+ ('world', 769),
+ ('epidemic', 626),
+ ('time', 616),
+ ('life', 612),
+ ('good', 531),
+ ('love', 525),
+ ('us', 492),
+ ('come', 402),
+ ('first', 388),
+ ('hong', 377),
+ ('kong', 374),
+ ('best', 362),
+ ('see', 359),
+ ('video', 348),
+ ('never', 346),
+ ('know', 340),
+ ('today', 338),
+ ('man', 333),
+ ('make', 328),
+ ('fight', 306),
+ ('want', 305),
+ ('must', 302),
+ ('chinese', 302),
+ ('covid19', 298),
+ ('going', 298),
+ ('新冠肺炎', 295),
+ ('新冠病毒', 294),
+ ('work', 286)]
+counter_min = get_counter(df_en[df_en.cluster == counts.idxmin()], global_stopwords+local_stopwords)
+counter_min.most_common(30)
+[('肺炎', 1596),
+ ('病毒', 1373),
+ ('epidemic', 458),
+ ('china', 424),
+ ('covid19', 318),
+ ('world', 298),
+ ('virus', 276),
+ ('fight', 184),
+ ('together', 170),
+ ('people', 162),
+ ('overcome', 142),
+ ('chinese', 137),
+ ('face', 135),
+ ('us', 134),
+ ('united', 132),
+ ('global', 128),
+ ('countries', 120),
+ ('fighting', 118),
+ ('pneumonia', 110),
+ ('let', 110),
+ ('government', 106),
+ ('help', 97),
+ ('states', 94),
+ ('responsibility', 91),
+ ('come', 88),
+ ('hope', 86),
+ ('viruses', 72),
+ ('outbreak', 67),
+ ('香港', 65),
+ ('terrible', 64)]
+# ! pip install --user wordcloud
+Word Cloud for Biggest Cluster
+from wordcloud import WordCloud
+from IPython.display import Image
+wc = WordCloud(background_color="white", max_words=100, width=800, height=500)
+wc.generate_from_frequencies(counter_max)
+wc.to_file("wordcloud.png")
+Image(filename="wordcloud.png")
+
+Word Cloud for smallest cluster
+from wordcloud import WordCloud
+from IPython.display import Image
+wc = WordCloud(background_color="white", max_words=100, width=800, height=500)
+wc.generate_from_frequencies(counter_min)
+wc.to_file("wordcloud_min.png")
+Image(filename="wordcloud_min.png")
+
+Word Network Analysis
+from collections import Counter
+
+###################################################################################
+# The 'counter' object will have all the word count information. 
+# The 'co_counter' object will have all the co-occurrence count information.
+###################################################################################
+
+counter = Counter()
+co_counter = dict()
+
+for l in df_en.words:
+    word_set = set()
+    
+    for item in l:
+        word = item.lower()
+        
+        if word not in (global_stopwords + local_stopwords):
+            word_set.add(word)
+
+    counter.update(word_set)
+    
+    ###################################################################################
+    # Calculate co-occurrence count of two words and save it in 'co_counter' 
+    ###################################################################################
+
+    words = list(word_set)
+    for word1 in words:
+        if word1 not in co_counter:
+            co_counter[word1] = dict()
+        
+        for word2 in words:
+
+            ######################################
+            # Skip if the two words are the same.
+            ######################################
+
+            if word1 == word2:
+                continue
+            
+            if word2 not in co_counter[word1]:
+                co_counter[word1][word2] = 1
+            else:
+                co_counter[word1][word2] += 1
+import networkx as nx
+
+G = nx.Graph()
+
+num_nodes = 30
+
+nodes = [item[0] for item in counter.most_common(num_nodes)]
+node_weights = [item[1]*2 for item in counter.most_common(num_nodes)]
+
+for word in nodes:
+    G.add_node(word, weight=counter.get(word))
+    
+for word1 in nodes:
+    for word2 in nodes:
+        if (word1 != word2) & (word2 in co_counter[word1]):
+            G.add_edge(word1, word2, weight=co_counter[word1][word2])
+            
+edges = nx.get_edge_attributes(G, "weight").keys()
+edge_weights = nx.get_edge_attributes(G, "weight").values()
+edge_weights = [item / 20 for item in edge_weights]
+
+from matplotlib import pyplot as plt
+
+plt.figure(figsize=(10, 10))
+nx.draw_networkx(G, pos=nx.spring_layout(G), 
+                 nodelist=nodes, node_size=node_weights, edgelist=edges, width=edge_weights,
+                 node_color="red", with_labels=True, font_size=10)
+plt.draw()
+
+Word Cloud With Mask
+Import Mask
+from PIL import Image
+
+im = Image.open('C:\\Users\\ewing\\Desktop\\Social Analytics\zhong_guo.jpg')
+im.save('zhong_guo.png')
+from PIL import Image
+
+im = Image.open('C:\\Users\\ewing\\Desktop\\Social Analytics\china_flag.jpg')
+im.save('china_flag.png')
+from PIL import Image
+
+im = Image.open('C:\\Users\\ewing\\Desktop\\Social Analytics\\flag.jpg')
+im.save('flag.png')
+Save as word cloud shaped like chinese characters
+import pandas as pd 
+import numpy as np
+import re 
+import string
+
+#uncomment the next two lines if you do not have the stopwords list installed yet.
+#import nltk      
+#nltk.download('stopwords')
+
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+from wordcloud import WordCloud, STOPWORDS 
+import matplotlib.pyplot as plt
+%matplotlib inline
+from PIL import Image
+from textblob import TextBlob
+Process Text for Word Cloud
+Already Processed, but just to ensure accuracy
+def TweetPreprocessing(text): 
+    # get lowercase
+    text = text.lower()
+    # remove numbers    # remove numbers
+
+    text = re.sub(r'\d+', '', text)
+    # remove urls
+    text = re.sub(r'^https?:\/\/.*[\r\n]*', '', text)
+    # remove punctuation
+    text = text.translate(text.maketrans('', '', string.punctuation))
+    # strip whitespace
+    text = text.strip()
+    # remove stop words
+    stop_words = stopwords.words('english')
+    newStopWords = ['html','rt', 'good', 'new', 'day', 'like', 'come', '郭文贵','香港']
+    stop_words.extend(newStopWords)
+    stop_words = set(stop_words)
+    tokens = word_tokenize(text)
+    words = [w for w in tokens if not w in stop_words]
+    text = " ".join(w for w in words)
+    text = text.replace('unitedstates', 'united states')
+    text = text.replace('figures', 'figure')
+    text = text.replace('hong kong', 'hongkong')
+
+    return text
+# combine all posts as one big text
+posts = df_en.tweet_text_nourl.values
+text = " ".join(t for t in posts)
+# preprocess text
+processed_text = TweetPreprocessing(text)
+### Load Mask
+mask = np.array(Image.open("zhong_guo.png"))
+flag = np.array(Image.open("china_flag.png"))
+flag1 = np.array(Image.open("flag.png"))
+Create Word Cloud in Form Of Mask
+wc = WordCloud(background_color='white', mask=mask, mode='RGB',
+               width=200, max_words=200, height=100,
+               random_state=1, contour_width=1, contour_color='firebrick')
+wc.generate(processed_text)
+plt.figure(figsize=(10, 10))
+plt.imshow(wc)
+plt.tight_layout(pad=0)
+plt.axis('off')
+plt.show()
+
+mask = np.array(Image.open("zhong_guo.png"))
+
+wordcloud = WordCloud(background_color='white', mask=mask, max_font_size=300, max_words=150,
+                      width = 800, height = 400, scale = 6, collocations=False).generate(processed_text)
+
+# Store default colored image, recolor, and save
+default_colors = wordcloud.to_array()
+wc.recolor(color_func=image_colors)
+#wordcloud.to_file("stormtrooper_wc.png")
+
+plt.figure(figsize=(20, 10))
+plt.imshow(wordcloud, interpolation="bilinear")
+plt.axis("off")
+plt.show()
+
+Word Grams
+import pandas as pd 
+import re 
+import string 
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+import nltk.corpus  
+from nltk.text import Text  
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.cluster import KMeans
+from sklearn.decomposition import LatentDirichletAllocation
+from scipy.cluster.hierarchy import ward, dendrogram, single,complete,average,weighted,centroid,median
+from scipy.spatial.distance import pdist
+import numpy as np
+import matplotlib.cm as matcm
+from networkx.algorithms import community
+import math
+import networkx as nx
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+%matplotlib inline
+def ReviewsPreprocessing(text): 
+    # get lowercase
+    text = text.lower()
+    # remove numbers    # remove numbers
+
+    text = re.sub(r'\d+', '', text)
+    # remove urls
+    text = re.sub(r'^https?:\/\/.*[\r\n]*', '', text)
+    # remove punctuation
+    text = text.translate(text.maketrans('', '', string.punctuation))
+    # strip whitespace
+    text = text.strip()
+    # remove stop words
+    stop_words = stopwords.words('english')
+    newStopWords = ['html','yet', '’', '``', '…', '...', "''", '‘', '“', '”', "'m", "'re", "'s", "'ve", 'amp', 'https', "n't", 'rt', 
+                   'a…', 'co', 'i…','itâ€™s', 'â€\x9d', 'one', 'could','would', 'also', 'â€', 'said', '—', 'itâ', 'new',
+                  'get', 'say', 'way', 'day', 'ca', 'many', 'get', 'like', 'end', 'gtv', 'go', 'https']
+    stop_words.extend(newStopWords)
+    stop_words = set(stop_words)
+    tokens = word_tokenize(text)
+    words = [w for w in tokens if not w in stop_words]
+    text = " ".join(w for w in words)
+    text = text.replace('thisway', 'this way')
+    text = text.replace('figures', 'figure')
+    text = text.replace('hong kong', 'hongkong')
+
+    return text
+posts = df_en.tweet_text.values
+# preprocess posts
+processed_posts = [ReviewsPreprocessing(text) for text in posts]
+# Find frequent words and Generate word and frequency list
+vectorizer = CountVectorizer(stop_words='english', lowercase = True) 
+# Now X is the document-term matrix. 
+x = vectorizer.fit_transform(processed_posts)
+sum_words = x.sum(axis=0) 
+words_freq = [(word, sum_words[0, idx]) for word, idx in vectorizer.vocabulary_.items()]
+words_freq =sorted(words_freq, key = lambda x: x[1], reverse=True)
+words_freq[:20]
+[('郭文贵', 7227),
+ ('milesguo', 6603),
+ ('香港', 4310),
+ ('hongkong', 3030),
+ ('肺炎', 2771),
+ ('病毒', 2417),
+ ('guo', 1909),
+ ('people', 1650),
+ ('epidemic', 1502),
+ ('wengui', 1286),
+ ('world', 1272),
+ ('china', 1204),
+ ('time', 970),
+ ('covid', 890),
+ ('money', 880),
+ ('good', 833),
+ ('life', 776),
+ ('make', 721),
+ ('believe', 681),
+ ('come', 666)]
+terms_bigram[0]
+[('necessity', 'mother'), ('mother', 'invention')]
+bigrams = list(itertools.chain(*terms_bigram))
+
+
+bigram_counts = collections.Counter(bigrams)
+
+bigram_df = pd.DataFrame(bigram_counts.most_common(20),columns=['bigram', 'count'])
+bigram_df
+bigram	count
+0	(郭文贵, milesguo)	3365
+1	(hong, kong)	2762
+2	(guo, wengui)	1076
+3	(病毒, 肺炎)	735
+4	(肺炎, 病毒)	636
+5	(香港, 香港)	435
+6	(guo, wenguis)	419
+7	(香港, hong)	417
+8	(united, states)	388
+9	(郭文贵, guo)	375
+10	(milesguo, 郭文贵)	353
+11	(work, together)	267
+12	(milesguo, guo)	266
+13	(milesguo, milesguo)	224
+14	(fight, epidemic)	207
+15	(rule, law)	203
+16	(肺炎, covid)	192
+17	(wen, gui)	181
+18	(hong, kongs)	181
+19	(kong, people)	161
+### Tri grams
+posts = df_en.tweet_text.values
+# preprocess posts
+processed_posts = [ReviewsPreprocessing(text) for text in posts]
+# Find frequent words and Generate word and frequency list
+vectorizer = CountVectorizer(stop_words='english', lowercase = True, ngram_range=(3,3)) 
+# Now X is the document-term matrix. 
+x = vectorizer.fit_transform(processed_posts)
+sum_words = x.sum(axis=0) 
+words_freq = [(word, sum_words[0, idx]) for word, idx in vectorizer.vocabulary_.items()]
+words_freq =sorted(words_freq, key = lambda x: x[1], reverse=True)
+words_freq[:20]
+[('病毒 肺炎 covid', 217),
+ ('郭文贵 guo wengui', 211),
+ ('milesguo guo wengui', 183),
+ ('郭文贵 milesguo liars', 159),
+ ('milesguo liars group', 159),
+ ('liars group evil', 159),
+ ('group evil liars郭文贵', 159),
+ ('evil liars郭文贵 milesguo', 159),
+ ('郭文贵 guo wenguis', 143),
+ ('郭文贵 milesguo milesguo', 142),
+ ('milesguo repeatedly beaten', 139),
+ ('rule law fund', 129),
+ ('disguise majority netizens', 121),
+ ('majority netizens longer', 121),
+ ('netizens longer believe', 121),
+ ('longer believe right', 111),
+ ('郭文贵 milesguo repeatedly', 107),
+ ('repeatedly beaten make', 107),
+ ('beaten make milesguo', 107),
+ ('longer provoke internal', 106)]
+LDA Topic Modeling
+num_topics = 5
+from sklearn.decomposition import LatentDirichletAllocation as LDA
+lda = LDA(n_components=num_topics, random_state=0)   # LDA uses randomness to get a probability distribution
+lda
+LatentDirichletAllocation(n_components=5, random_state=0)
+%time lda.fit(X)
+Wall time: 1min 38s
+LatentDirichletAllocation(n_components=5, random_state=0)
+lda.components_
+array([[ 0.20044857,  6.62981465,  0.2000178 , ...,  0.426265  ,
+         0.20001652,  0.20001652],
+       [10.25831398,  9.68207479,  0.20001528, ...,  0.20001395,
+         0.2000134 ,  0.2000134 ],
+       [ 0.20141849,  5.15053027,  0.20001732, ...,  0.20001638,
+         0.45668288,  0.45668288],
+       [ 3.79831916, 14.40296505,  0.46893297, ...,  0.20001619,
+         0.20002487,  0.20002487],
+       [ 0.20022797,  0.64306153,  0.20001599, ...,  0.2000152 ,
+         0.20001629,  0.20001629]])
+lda.components_.shape
+(5, 28302)
+def show_topics(model, feature_names, num_top_words):
+    for topic_idx, topic_scores in enumerate(model.components_):
+        print("***Topic {}:".format(topic_idx))
+        print(" + ".join(["{:.2f} * {}".format(topic_scores[i], feature_names[i]) for i in topic_scores.argsort()[::-1][:num_top_words]]))
+        print()
+show_topics(lda, vectorizer.get_feature_names(), 10)
+***Topic 0:
+340.40 * 香港 + 279.30 * hong + 277.02 * kong + 118.19 * 郭文贵 + 95.67 * milesguo + 84.16 * 病毒 + 82.44 * 肺炎 + 70.56 * time + 67.89 * long + 60.75 * china
+
+***Topic 1:
+502.77 * 郭文贵 + 322.40 * milesguo + 157.42 * epidemic + 153.88 * 肺炎 + 128.19 * guo + 127.03 * money + 116.63 * wengui + 114.78 * world + 93.48 * liar + 92.13 * good
+
+***Topic 2:
+202.94 * 病毒 + 183.72 * 肺炎 + 178.16 * 郭文贵 + 169.70 * milesguo + 113.64 * liars + 100.31 * epidemic + 78.77 * china + 70.33 * guo + 63.29 * evil + 61.12 * wengui
+
+***Topic 3:
+192.85 * 郭文贵 + 144.00 * 香港 + 143.70 * milesguo + 77.56 * 肺炎 + 70.63 * 病毒 + 58.64 * come + 55.60 * virus + 54.41 * government + 51.76 * lies + 49.56 * kong
+
+***Topic 4:
+310.77 * 郭文贵 + 269.34 * milesguo + 215.62 * 香港 + 149.09 * kong + 149.06 * hong + 110.61 * people + 93.20 * guo + 76.72 * wengui + 76.49 * violence + 75.55 * believe
+
+import pyLDAvis
+import pyLDAvis.sklearn
+pyLDAvis.enable_notebook()
+pyLDAvis.sklearn.prepare(lda, X, vectorizer)
+Selected Topic:
+0
+Previous TopicNext TopicClear TopicSlide to adjust relevance metric:(2)
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0
+λ = 1
+PC1
+PC2
+Marginal topic distribtion
+2%
+5%
+10%
+1
+2
+3
+4
+5
+Intertopic Distance Map (via multidimensional scaling)
+Overall term frequency
+Estimated term frequency within the selected topic
+1. saliency(term w) = frequency(w) * [sum_t p(t | w) * log(p(t | w)/p(t))] for topics t; see Chuang et. al (2012)
+2. relevance(term w | topic t) = λ * p(w | t) + (1 - λ) * p(w | t)/p(w); see Sievert & Shirley (2014)
+hong
+kong
+香港
+liars
+epidemic
+病毒
+郭文贵
+twitter
+repeatedly
+evil
+肺炎
+beaten
+hello
+violence
+liar
+majority
+disguise
+internal
+group
+able
+netizens
+money
+rhetoric
+want
+longer
+frantically
+opposition
+peace
+knows
+contradictions
+0
+200
+400
+600
+800
+1,000
+Top-30 Most Salient Terms1
+Sentiment
+from nltk.stem import WordNetLemmatizer
+import numpy as np
+from textblob import TextBlob
+import re
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+import seaborn as sns
+# Sentiment analysis using Textblob
+def sentiment(tweet):
+
+    analysis = TextBlob(tweet)
+    if analysis.sentiment.polarity > 0:
+        return 1
+    elif analysis.sentiment.polarity == 0:
+        return 0
+    else:
+        return -1
+    
+df_en['Sentiment'] = df_en['tweet_text_nourl'].apply(sentiment)
+
+df_en.head(20)
+<ipython-input-54-73c3adfa9230>:12: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df_en['Sentiment'] = df_en['tweet_text_nourl'].apply(sentiment)
+tweetid	userid	user_display_name	user_screen_name	user_reported_location	user_profile_description	user_profile_url	follower_count	following_count	account_creation_date	...	hashtags	urls	user_mentions	user_reported_locaton	tweet_text_nourl	text_splits	cluster	words	tagged_words	Sentiment
+6	1185304968196059137	R0Slx3hL3ZJu5kyyPGACZ4pDv3S7hjAXAJt1a5l+1k=	R0Slx3hL3ZJu5kyyPGACZ4pDv3S7hjAXAJt1a5l+1k=	R0Slx3hL3ZJu5kyyPGACZ4pDv3S7hjAXAJt1a5l+1k=	NaN	NaN	NaN	0	7	2019-09-26	...	[]	[]	[]	nan	Necessity is the mother of invention	[Necessity, is, the, mother, of, invention]	2	[Necessity, is, the, mother, of, invention]	[(Necessity, NN), (is, VBZ), (the, DT), (mother, NN), (of, IN), (invention, NN)]	0
+16	1243042443257233408	E66CDppcqsRqNrDOtgt+b7g3jtxXnd4pm+oKumaf0=	E66CDppcqsRqNrDOtgt+b7g3jtxXnd4pm+oKumaf0=	E66CDppcqsRqNrDOtgt+b7g3jtxXnd4pm+oKumaf0=	NaN	NaN	NaN	3	4	2020-03-22	...	[]	[https://t.co/fYcIwvSicA]	[]	nan	#病毒 Constantly defying the will of the citizens and constantly creating confrontational conflicts. The insurgents do not reflect on their past an...	[#病毒, Constantly, defying, the, will, of, the, citizens, and, constantly, creating, confrontational, conflicts., The, insurgents, do, not, reflect...	2	[#, 病毒, Constantly, defying, the, will, of, the, citizens, and, constantly, creating, confrontational, conflicts, ., The, insurgents, do, not, ref...	[(#, #), (病毒, NNP), (Constantly, NNP), (defying, VBG), (the, DT), (will, MD), (of, IN), (the, DT), (citizens, NNS), (and, CC), (constantly, RB), (...	-1
+19	1243728803853033473	QeuSwYj3XhCDPqznL9K2MpcOZDWKVwr0juTMeOwmmM=	QeuSwYj3XhCDPqznL9K2MpcOZDWKVwr0juTMeOwmmM=	QeuSwYj3XhCDPqznL9K2MpcOZDWKVwr0juTMeOwmmM=	NaN	NaN	NaN	0	6	2020-03-19	...	[]	[https://t.co/mCzlw4ncXU]	[]	nan	#肺炎 #病毒 The priceless life should not be the victim of some politicians' pursuit of their own political demands and interests	[#肺炎, #病毒, The, priceless, life, should, not, be, the, victim, of, some, politicians', pursuit, of, their, own, political, demands, and, interests...	0	[#, 肺炎, #, 病毒, The, priceless, life, should, not, be, the, victim, of, some, politicians, ', pursuit, of, their, own, political, demands, and, int...	[(#, #), (肺炎, JJ), (#, #), (病毒, PDT), (The, DT), (priceless, JJ), (life, NN), (should, MD), (not, RB), (be, VB), (the, DT), (victim, NN), (of, IN)...	1
+27	1189420942725771264	3OxMupZmacWaX78S+vSMic2LQgxT+xtvdYC8aizgFJQ=	3OxMupZmacWaX78S+vSMic2LQgxT+xtvdYC8aizgFJQ=	3OxMupZmacWaX78S+vSMic2LQgxT+xtvdYC8aizgFJQ=	NaN	NaN	NaN	3	1	2019-10-21	...	[]	[]	[]	nan	Want to see the walking dead, but feel a little scared	[Want, to, see, the, walking, dead,, but, feel, a, little, scared]	2	[Want, to, see, the, walking, dead, ,, but, feel, a, little, scared]	[(Want, VB), (to, TO), (see, VB), (the, DT), (walking, VBG), (dead, JJ), (,, ,), (but, CC), (feel, VB), (a, DT), (little, JJ), (scared, JJ)]	-1
+32	1212911408909733888	rBAzPJ+6ChWgBGz+tOIEapqN8V78cFqmZFmfZa6cB1s=	rBAzPJ+6ChWgBGz+tOIEapqN8V78cFqmZFmfZa6cB1s=	rBAzPJ+6ChWgBGz+tOIEapqN8V78cFqmZFmfZa6cB1s=	NaN	NaN	NaN	0	0	2019-12-13	...	['#HongKong', '#Kekistan']	[https://t.co/X8Wc2VwRgl]	[]	nan	Maybe should call that Kekong? #HongKong #Kekistan	[Maybe, should, call, that, Kekong?, #HongKong, #Kekistan, https://t.co/X8Wc2VwRgl]	2	[Maybe, should, call, that, Kekong, ?, #, HongKong, #, Kekistan]	[(Maybe, RB), (should, MD), (call, VB), (that, IN), (Kekong, NNP), (?, .), (#, #), (HongKong, NNP), (#, #), (Kekistan, NNP)]	0
+61	1186540661069271040	yx2ta+rENDPinVF2GDbq8QRmAR6fYqstYwUud71oN9w=	yx2ta+rENDPinVF2GDbq8QRmAR6fYqstYwUud71oN9w=	yx2ta+rENDPinVF2GDbq8QRmAR6fYqstYwUud71oN9w=	NaN	NaN	NaN	2	3	2019-10-10	...	[]	[https://t.co/ZL1ghgcVly]	[]	nan	Love is not a maybe thing. You know when you love someone.	[Love, is, not, a, maybe, thing., You, know, when, you, love, someone., https://t.co/ZL1ghgcVly]	2	[Love, is, not, a, maybe, thing, ., You, know, when, you, love, someone, .]	[(Love, NNP), (is, VBZ), (not, RB), (a, DT), (maybe, RB), (thing, NN), (., .), (You, PRP), (know, VBP), (when, WRB), (you, PRP), (love, VBP), (som...	1
+66	1197796739207426048	9uFCufGq1Q2XZThn9AssdPdyJJP5NiifMJnDEeRy3Q4=	9uFCufGq1Q2XZThn9AssdPdyJJP5NiifMJnDEeRy3Q4=	9uFCufGq1Q2XZThn9AssdPdyJJP5NiifMJnDEeRy3Q4=	NaN	NaN	NaN	0	2	2019-04-12	...	[]	[]	[]	nan	The purpose of life is to live it out, to experience the ultimate, to imitate the hand eagerly, without worrying about new and richer experiences.	[The, purpose, of, life, is, to, live, it, out,, to, experience, the, ultimate,, to, imitate, the, hand, eagerly,, without, worrying, about, new, ...	2	[The, purpose, of, life, is, to, live, it, out, ,, to, experience, the, ultimate, ,, to, imitate, the, hand, eagerly, ,, without, worrying, about,...	[(The, DT), (purpose, NN), (of, IN), (life, NN), (is, VBZ), (to, TO), (live, VB), (it, PRP), (out, RP), (,, ,), (to, TO), (experience, VB), (the, ...	1
+77	1224589207743664128	wfeJeC2kPiji8ISzyyfv6bmRqkSbkpGtzCAIn8eOnc=	wfeJeC2kPiji8ISzyyfv6bmRqkSbkpGtzCAIn8eOnc=	wfeJeC2kPiji8ISzyyfv6bmRqkSbkpGtzCAIn8eOnc=	NaN	NaN	NaN	0	0	2020-02-04	...	[]	[]	[]	nan	�I think	[�I, think]	2	[�I, think]	[(�I, NN), (think, NN)]	0
+79	1217226637105934336	qwRIdX1hqUfQRrkbHodTlssKMt4roHMABDj9TbEd9TA=	qwRIdX1hqUfQRrkbHodTlssKMt4roHMABDj9TbEd9TA=	qwRIdX1hqUfQRrkbHodTlssKMt4roHMABDj9TbEd9TA=	NaN	NaN	NaN	6	0	2020-01-14	...	[]	[]	[]	nan	I watched to see whether it would spread: but no	[I, watched, to, see, whether, it, would, spread:, but, no]	2	[I, watched, to, see, whether, it, would, spread, :, but, no]	[(I, PRP), (watched, VBD), (to, TO), (see, VB), (whether, IN), (it, PRP), (would, MD), (spread, VB), (:, :), (but, CC), (no, DT)]	0
+92	1239545328858288128	R1pLH0Jsca06sFGq9ennZIszcJKRXPVMZZfIRgdYg=	R1pLH0Jsca06sFGq9ennZIszcJKRXPVMZZfIRgdYg=	R1pLH0Jsca06sFGq9ennZIszcJKRXPVMZZfIRgdYg=	NaN	尼多娜	NaN	0	0	2020-03-16	...	[]	[]	[]	nan	child thought see nothing, therefore he speak so free. Your	[child, thought, see, nothing,, therefore, he, speak, so, free., Your]	2	[child, thought, see, nothing, ,, therefore, he, speak, so, free, ., Your]	[(child, NN), (thought, VBD), (see, VB), (nothing, NN), (,, ,), (therefore, RB), (he, PRP), (speak, VBZ), (so, RB), (free, JJ), (., .), (Your, PRP$)]	1
+100	1191968722099023873	rnYXDM7COuomO08KpF09nXU6Rl7AUwy9X3zJDBgv7+Y=	rnYXDM7COuomO08KpF09nXU6Rl7AUwy9X3zJDBgv7+Y=	rnYXDM7COuomO08KpF09nXU6Rl7AUwy9X3zJDBgv7+Y=	NaN	NaN	NaN	0	0	2019-11-03	...	[]	[]	[]	nan	Love, career and family, are selected item, as to what will finally be the best answer that only you know	[Love,, career, and, family,, are, selected, item,, as, to, what, will, finally, be, the, best, answer, that, only, you, know]	2	[Love, ,, career, and, family, ,, are, selected, item, ,, as, to, what, will, finally, be, the, best, answer, that, only, you, know]	[(Love, NNP), (,, ,), (career, NN), (and, CC), (family, NN), (,, ,), (are, VBP), (selected, VBN), (item, NN), (,, ,), (as, IN), (to, TO), (what, W...	1
+104	1180867724949499906	VsXF33lZ9sZxcuWu7YEo4RBp4tABF+k2T+e5Roujr5w=	VsXF33lZ9sZxcuWu7YEo4RBp4tABF+k2T+e5Roujr5w=	VsXF33lZ9sZxcuWu7YEo4RBp4tABF+k2T+e5Roujr5w=	Albuquerque	#FOLLOW Holmes Albuquerque #InstantFollow #InstantFollowBack #teamfollowback #FollowNow #FollowFriday	NaN	0	1	2019-10-06	...	[]	[]	[]	Albuquerque	From that hour, nobody is proved to have seen her. I loathed her with a hatred belong more to demon than to man. But the gang which has drawn upon.	[From, that, hour,, nobody, is, proved, to, have, seen, her., I, loathed, her, with, a, hatred, belong, more, to, demon, than, to, man., But, the,...	2	[From, that, hour, ,, nobody, is, proved, to, have, seen, her, ., I, loathed, her, with, a, hatred, belong, more, to, demon, than, to, man, ., But...	[(From, IN), (that, DT), (hour, NN), (,, ,), (nobody, NN), (is, VBZ), (proved, VBN), (to, TO), (have, VB), (seen, VBN), (her, PRP$), (., .), (I, P...	1
+111	1185414315278385152	jAOho4WLPQRpFnfBjXpa8TJlM3Xn2O9+NsW2KbKc1eY=	jAOho4WLPQRpFnfBjXpa8TJlM3Xn2O9+NsW2KbKc1eY=	jAOho4WLPQRpFnfBjXpa8TJlM3Xn2O9+NsW2KbKc1eY=	NaN	NaN	NaN	0	2	2019-09-22	...	[]	[https://t.co/PTACGwlotK]	[]	nan	In autumn, most of the leaves have gradually turned yellow. Some of them have withered down. Only maple leaves have turned red, which adds a beaut...	[In, autumn,, most, of, the, leaves, have, gradually, turned, yellow., Some, of, them, have, withered, down., Only, maple, leaves, have, turned, r...	2	[In, autumn, ,, most, of, the, leaves, have, gradually, turned, yellow, ., Some, of, them, have, withered, down, ., Only, maple, leaves, have, tur...	[(In, IN), (autumn, NN), (,, ,), (most, JJS), (of, IN), (the, DT), (leaves, NNS), (have, VBP), (gradually, RB), (turned, VBN), (yellow, RP), (., ....	1
+113	1246978955011223555	THHNWavP0oCRYtFf04+Gxt39V3mpV+fYhgyETJXww7E=	THHNWavP0oCRYtFf04+Gxt39V3mpV+fYhgyETJXww7E=	THHNWavP0oCRYtFf04+Gxt39V3mpV+fYhgyETJXww7E=	NaN	NaN	NaN	3	1	2020-03-04	...	[]	[]	[]	nan	Until you make peace with who you are, you'll never be content with what you have.	[Until, you, make, peace, with, who, you, are,, you'll, never, be, content, with, what, you, have.]	2	[Until, you, make, peace, with, who, you, are, ,, you, 'll, never, be, content, with, what, you, have, .]	[(Until, IN), (you, PRP), (make, VBP), (peace, NN), (with, IN), (who, WP), (you, PRP), (are, VBP), (,, ,), (you, PRP), ('ll, MD), (never, RB), (be...	0
+133	1221497045065793541	IGsS99ojv+7JslHWWIVhZLXRxYQPUpQx3WxadGXfYZI=	IGsS99ojv+7JslHWWIVhZLXRxYQPUpQx3WxadGXfYZI=	IGsS99ojv+7JslHWWIVhZLXRxYQPUpQx3WxadGXfYZI=	NaN	NaN	NaN	0	0	2020-01-26	...	[]	[]	[]	nan	for home. That is not like Jonathan. I do not understand it,	[for, home., That, is, not, like, Jonathan., I, do, not, understand, it,]	2	[for, home, ., That, is, not, like, Jonathan, ., I, do, not, understand, it, ,]	[(for, IN), (home, NN), (., .), (That, DT), (is, VBZ), (not, RB), (like, JJ), (Jonathan, NNP), (., .), (I, PRP), (do, VBP), (not, RB), (understand...	0
+134	1183074075217776641	hXUKhCFKBf6iiU57zXwVdLanA1Jf5F7bd2wEGPLMRSE=	hXUKhCFKBf6iiU57zXwVdLanA1Jf5F7bd2wEGPLMRSE=	hXUKhCFKBf6iiU57zXwVdLanA1Jf5F7bd2wEGPLMRSE=	Suginami-ku	Walking Organ Donor, Information Addict, I like pop-up books	NaN	0	0	2019-10-12	...	[]	[]	[]	Suginami-ku	Believer! Storyfinder? Leader of Change?	[Believer!, Storyfinder?, Leader, of, Change?]	2	[Believer, !, Storyfinder, ?, Leader, of, Change, ?]	[(Believer, NN), (!, .), (Storyfinder, NN), (?, .), (Leader, NNP), (of, IN), (Change, NNP), (?, .)]	0
+143	1230970830529626112	OuGpcPV2ud1gigIyuQCpWoQnEB20YRRHazlQmproWk=	OuGpcPV2ud1gigIyuQCpWoQnEB20YRRHazlQmproWk=	OuGpcPV2ud1gigIyuQCpWoQnEB20YRRHazlQmproWk=	NaN	NaN	NaN	3	3	2020-02-21	...	[]	[]	[]	nan	it was he who put the launch in trim again.	[it, was, he, who, put, the, launch, in, trim, again.]	2	[it, was, he, who, put, the, launch, in, trim, again, .]	[(it, PRP), (was, VBD), (he, PRP), (who, WP), (put, VBD), (the, DT), (launch, NN), (in, IN), (trim, JJ), (again, RB), (., .)]	0
+145	1241267439100465152	CrYjSA0JsuQUH01Xhc3I2ypIE1FUIDBQnk6S0M+lH8=	CrYjSA0JsuQUH01Xhc3I2ypIE1FUIDBQnk6S0M+lH8=	CrYjSA0JsuQUH01Xhc3I2ypIE1FUIDBQnk6S0M+lH8=	NaN	最具挑战性的挑战莫过于提升自我。裂空座	NaN	7	0	2020-03-21	...	[]	[]	[]	nan	day a telegram saying if the ship had been reported. He was	[day, a, telegram, saying, if, the, ship, had, been, reported., He, was]	2	[day, a, telegram, saying, if, the, ship, had, been, reported, ., He, was]	[(day, NN), (a, DT), (telegram, NN), (saying, VBG), (if, IN), (the, DT), (ship, NN), (had, VBD), (been, VBN), (reported, VBN), (., .), (He, PRP), ...	0
+152	1230782221348261889	D8PpWf6YWLnMjVLK6+DYoInff0TbNPECUnENgkJnpGo=	D8PpWf6YWLnMjVLK6+DYoInff0TbNPECUnENgkJnpGo=	D8PpWf6YWLnMjVLK6+DYoInff0TbNPECUnENgkJnpGo=	NaN	NaN	NaN	2	7	2020-02-09	...	[]	[]	[]	nan	Cease to struggle and you cease to live.	[Cease, to, struggle, and, you, cease, to, live.]	2	[Cease, to, struggle, and, you, cease, to, live, .]	[(Cease, NNP), (to, TO), (struggle, VB), (and, CC), (you, PRP), (cease, VBP), (to, TO), (live, VB), (., .)]	1
+177	1192661574588067840	59hNr3RaeRtwMOura5dZvRWoPxyBUMnIQHhebdf2BrA=	59hNr3RaeRtwMOura5dZvRWoPxyBUMnIQHhebdf2BrA=	59hNr3RaeRtwMOura5dZvRWoPxyBUMnIQHhebdf2BrA=	NaN	NaN	NaN	10	0	2019-10-30	...	[]	[https://t.co/VdZY6IpwMD]	[]	nan	The Origin of Halloween	[The, Origin, of, Halloween, https://t.co/VdZY6IpwMD]	2	[The, Origin, of, Halloween]	[(The, DT), (Origin, NNP), (of, IN), (Halloween, NNP)]	0
+20 rows × 37 columns
+
+df_en_sentiment = df_en[["tweet_text_nourl", "Sentiment"]]
+df_en_sentiment.head()
+tweet_text_nourl	Sentiment
+6	Necessity is the mother of invention	0
+16	#病毒 Constantly defying the will of the citizens and constantly creating confrontational conflicts. The insurgents do not reflect on their past an...	-1
+19	#肺炎 #病毒 The priceless life should not be the victim of some politicians' pursuit of their own political demands and interests	1
+27	Want to see the walking dead, but feel a little scared	-1
+32	Maybe should call that Kekong? #HongKong #Kekistan	0
+df_en_sentiment.groupby(['Sentiment']).count()
+tweet_text_nourl
+Sentiment	
+-1	6404
+0	13919
+1	12603
+import pandas as pd
+import numpy as np
+%matplotlib inline
+from plotly import __version__
+from plotly.offline import download_plotlyjs, init_notebook_mode, plot, iplot
+import cufflinks as cf
+init_notebook_mode(connected=True)
+cf.go_offline()
+df_en_sentiment.iplot(kind='bar',x='Sentiment',y='tweet_text_nourl')
+ 
+ 
+Hashtags
+Htag_df = df_en
+j = 0
+
+results = []
+
+for tweet in range(0,len(results)):
+    hashtag = results[hashtags].entities.get('hashtags')
+    for i in range(0,len(hashtag)):
+        Htag = hashtag[i]['hashtags'] 
+        Htag_df.set_value(j, 'Hashtag',Htag)
+        j = j+1
+results
+[]
+df_en_hashtags = df_en[df_en.hashtags != "[]"]
+df_en_hashtags.head()
+tweetid	userid	user_display_name	user_screen_name	user_reported_location	user_profile_description	user_profile_url	follower_count	following_count	account_creation_date	...	hashtags	urls	user_mentions	user_reported_locaton	tweet_text_nourl	text_splits	cluster	words	tagged_words	Sentiment
+32	1212911408909733888	rBAzPJ+6ChWgBGz+tOIEapqN8V78cFqmZFmfZa6cB1s=	rBAzPJ+6ChWgBGz+tOIEapqN8V78cFqmZFmfZa6cB1s=	rBAzPJ+6ChWgBGz+tOIEapqN8V78cFqmZFmfZa6cB1s=	NaN	NaN	NaN	0	0	2019-12-13	...	['#HongKong', '#Kekistan']	[https://t.co/X8Wc2VwRgl]	[]	nan	Maybe should call that Kekong? #HongKong #Kekistan	[Maybe, should, call, that, Kekong?, #HongKong, #Kekistan, https://t.co/X8Wc2VwRgl]	2	[Maybe, should, call, that, Kekong, ?, #, HongKong, #, Kekistan]	[(Maybe, RB), (should, MD), (call, VB), (that, IN), (Kekong, NNP), (?, .), (#, #), (HongKong, NNP), (#, #), (Kekistan, NNP)]	0
+275	1244092203841904650	GCa9FDedIGW6CLyTGguIy0cDUZm74zTgUy93Sc10E=	GCa9FDedIGW6CLyTGguIy0cDUZm74zTgUy93Sc10E=	GCa9FDedIGW6CLyTGguIy0cDUZm74zTgUy93Sc10E=	NaN	NaN	NaN	1	0	2020-03-19	...	['#MilesGuo']	[https://t.co/khx3evkLMs]	[]	nan	#郭文贵 Guo Wengui, your shameless face will be seen by the world one day. #MilesGuo	[#郭文贵, Guo, Wengui,, your, shameless, face, will, be, seen, by, the, world, one, day., #MilesGuo, https://t.co/khx3evkLMs]	3	[#, 郭文贵, Guo, Wengui, ,, your, shameless, face, will, be, seen, by, the, world, one, day, ., #, MilesGuo]	[(#, #), (郭文贵, NNP), (Guo, NNP), (Wengui, NNP), (,, ,), (your, PRP$), (shameless, JJ), (face, NN), (will, MD), (be, VB), (seen, VBN), (by, IN), (t...	0
+288	1128448620133474304	GIoFD1XhLFgSbLsbB0ksJyyqEp6iU+FwNJcEs5Zj2o=	GIoFD1XhLFgSbLsbB0ksJyyqEp6iU+FwNJcEs5Zj2o=	GIoFD1XhLFgSbLsbB0ksJyyqEp6iU+FwNJcEs5Zj2o=	대한민국 서울	South Korea 💗, Japan 💟 , Russia💝, China 💘 WELCOME!!!!!!	NaN	24	286	2019-05-13	...	['#ChanXi', '#China']	[https://t.co/HPVgqsiaM6]	[]	대한민국 서울	Shan Xi, China #ChanXi it' s #China , baby	[Shan, Xi,, China, #ChanXi, it', s, #China, ,, baby, https://t.co/HPVgqsiaM6]	2	[Shan, Xi, ,, China, #, ChanXi, it, ', s, #, China, ,, baby]	[(Shan, NNP), (Xi, NNP), (,, ,), (China, NNP), (#, #), (ChanXi, NNP), (it, PRP), (', ''), (s, JJ), (#, #), (China, NNP), (,, ,), (baby, NN)]	0
+465	1153924459633397760	2kNjQiLSGhjB48twkhAqBBMczJPZ6vSWeDeWfFQgqz4=	2kNjQiLSGhjB48twkhAqBBMczJPZ6vSWeDeWfFQgqz4=	2kNjQiLSGhjB48twkhAqBBMczJPZ6vSWeDeWfFQgqz4=	NaN	NaN	NaN	8	13	2019-05-01	...	['#TootsieMusical']	[]	[@SantinoFontana, @tootsiemusical]	nan	RT @SantinoFontana: @tootsiemusical Tonight we are celebrating 100 BROADWAY PERFORMANCES of #TootsieMusical with the biggest balloons we co…	[RT, @SantinoFontana:, @tootsiemusical, Tonight, we, are, celebrating, 100, BROADWAY, PERFORMANCES, of, #TootsieMusical, with, the, biggest, ballo...	2	[RT, @, SantinoFontana, :, @, tootsiemusical, Tonight, we, are, celebrating, 100, BROADWAY, PERFORMANCES, of, #, TootsieMusical, with, the, bigges...	[(RT, NNP), (@, NNP), (SantinoFontana, NNP), (:, :), (@, JJ), (tootsiemusical, JJ), (Tonight, NNP), (we, PRP), (are, VBP), (celebrating, VBG), (10...	0
+595	1245564627062153218	XUwSoDRTFMI0VAtPoj1pDi9W2JFoVhAuDT5HZJSiKZs=	XUwSoDRTFMI0VAtPoj1pDi9W2JFoVhAuDT5HZJSiKZs=	XUwSoDRTFMI0VAtPoj1pDi9W2JFoVhAuDT5HZJSiKZs=	NaN	NaN	NaN	7	3	2020-03-29	...	['#MilesGuo', '#MilesGuo']	[https://t.co/k98jAqYgCk]	[]	nan	#郭文贵 #MilesGuo Wen Gui is really ating and and getting more and more admired, admired #郭文贵 #MilesGuo	[#郭文贵, #MilesGuo, Wen, Gui, is, really, ating, and, and, getting, more, and, more, admired,, admired, #郭文贵, #MilesGuo, https://t.co/k98jAqYgCk]	1	[#, 郭文贵, #, MilesGuo, Wen, Gui, is, really, ating, and, and, getting, more, and, more, admired, ,, admired, #, 郭文贵, #, MilesGuo]	[(#, #), (郭文贵, JJ), (#, #), (MilesGuo, NNP), (Wen, NNP), (Gui, NNP), (is, VBZ), (really, RB), (ating, JJ), (and, CC), (and, CC), (getting, VBG), (...	1
+5 rows × 37 columns
+
+# Unique hashtag counts
+table = df_en_hashtags.pivot_table(index="hashtags",values='tweetid',aggfunc=len)
+
+table
+tweetid
+hashtags	
+['#1', '#1']	1
+['#1', '#10', '#13', '#25', '#37', '#48', '#G_I_DLE']	1
+['#1', '#Frozen2']	1
+['#1', '#HappinessBegins']	1
+['#1', '#LFA78']	1
+...	...
+['#xmas', '#xmastree', '#xmasnails', '#xmas2019', '#christmas', '#ch']	1
+['#yangzi', '#denglun']	1
+['#youtubeisoverparty']	1
+['#yyc', '#ShareYourWeather']	1
+['#yyc', '#halloweencostume', '#halloween2019', '#Happy']	1
+1786 rows × 1 columns
+
+# Convert pivot table to dataframe
+df_pivot = pd.DataFrame(table.to_records())
+
+df_pivot.head()
+hashtags	tweetid
+0	['#1', '#1']	1
+1	['#1', '#10', '#13', '#25', '#37', '#48', '#G_I_DLE']	1
+2	['#1', '#Frozen2']	1
+3	['#1', '#HappinessBegins']	1
+4	['#1', '#LFA78']	1
+# Plotting hashtags counts
+
+data = df_pivot.nlargest(columns="tweetid", n = 15) 
+
+# Creating bar graph
+plt.figure(figsize=(16,5))
+ax = sns.barplot(data=data, x= "hashtags", y = "tweetid", palette=("Reds_d"))
+
+# Altering the visual elements
+sns.set_context("poster")
+ax.set(ylabel = 'Count')
+ax.set_xticklabels(labels=ax.get_xticklabels(),rotation=70)
+
+plt.title('English Language Tweet #Hashtags')
+
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.spines['bottom'].set_visible(False)
+
+# Output plot
+plt.show()
+
+import spacy
+nlp = spacy.load('en_core_web_sm')
+df_en['tweet_text_nohash'] = df_en['tweet_text_nohash'].astype(str)
+Guo_Wengui = [_ for _ in df_en.loc[lambda d: d['tweet_text_nourl'].str.lower().str.contains("Guo Wengui")]["tweet_text_nourl"]]
+def has_guowengui_lang(Guo_Wengui):
+    doc = nlp(Guo_Wengui)
+    for t in doc:
+        if t.lower_ in ["Guo Wengui"]:
+            
+                return True
+    return False
+
+g = (text for text in text if has_guowengui_lang(text))
+[next(g) for i in range(5)]
+df_milesguo = df_en[df_en.hashtags == "MilesGuo"]
+Time-Series Data
+Tweet date and likes
+tweet_time_likes = df.groupby(['tweet_time','tweet_language'])['like_count'].count()
+tweet_time_likes
+tweet_time           tweet_language
+2018-01-11 09:29:00  en                1
+2018-01-12 07:40:00  ru                1
+2018-01-28 08:54:00  ru                1
+2018-01-28 09:02:00  ru                1
+2018-01-28 09:03:00  ru                1
+                                      ..
+2020-04-17 02:13:00  zh                3
+2020-04-17 06:03:00  en                1
+                     ja                1
+2020-04-17 07:03:00  zh                1
+2020-04-17 07:13:00  zh                1
+Name: like_count, Length: 131612, dtype: int64
+tweet_time_likes.plot(kind='line')
+
+plt.title("Tweet Likes Per Languages")
+plt.ylabel("Tweet Likes")
+plt.xlabel("Date")
+
+plt.show()
+
+tweet_time = df.groupby(['tweet_time'])['tweetid'].count()
+tweet_time
+tweet_time
+2018-01-11 09:29:00    1
+2018-01-12 07:40:00    1
+2018-01-28 08:54:00    1
+2018-01-28 09:02:00    1
+2018-01-28 09:03:00    1
+                      ..
+2020-04-17 02:12:00    1
+2020-04-17 02:13:00    3
+2020-04-17 06:03:00    2
+2020-04-17 07:03:00    1
+2020-04-17 07:13:00    1
+Name: tweetid, Length: 104916, dtype: int64
+tweet_time.plot(kind='line')
+
+plt.title("Tweets by Date")
+plt.ylabel("# of Tweets (thousands)")
+plt.xlabel("Date")
+
+plt.show()
+
+df2 = df[["tweet_time", "tweet_text"]]
+df2.head()
+tweet_time	tweet_text
+0	2019-12-12 01:56	郭瘟鬼这个大骗子，打着换汇的幌子通过他的地下钱庄骗钱，张口就来，每天就是在炫耀自己的骗术，殊不知大家不过是在看小丑表演罢了，当诈骗犯郭瘟鬼的骗术到如今的地步，他连自己都一起骗了，整日活在自己的骗术世界里，等待着他的终归是法律的审判。 #郭文贵 https://t.co/cpcedj5WhC
+1	2020-01-06 06:05	https://t.co/hNm6nUAiE3
+2	2020-01-07 10:52	https://t.co/UKuYfubjgh
+3	2020-01-06 01:24	https://t.co/KtpavahflW
+4	2019-11-05 00:59	秋 https://t.co/36ISekYyC9
+df2['tweet_time)'] = df2['tweet_time'].astype(str)
+df2.info()
+<class 'pandas.core.frame.DataFrame'>
+Int64Index: 348608 entries, 0 to 348607
+Data columns (total 3 columns):
+ #   Column       Non-Null Count   Dtype 
+---  ------       --------------   ----- 
+ 0   tweet_time   348608 non-null  object
+ 1   tweet_text   348608 non-null  object
+ 2   tweet_time)  348608 non-null  object
+dtypes: object(3)
+memory usage: 10.6+ MB
+df2["tweet_year"] = [item[0] for item in df2.tweet_time.str.findall("\d\d\d\d")]
+
+df2["tweet_year"][:30]
+<>:1: DeprecationWarning:
+
+invalid escape sequence \d
+
+<ipython-input-194-723a230e29a1>:1: DeprecationWarning:
+
+invalid escape sequence \d
+
+0     2019
+1     2020
+2     2020
+3     2020
+4     2019
+5     2019
+6     2019
+7     2019
+8     2019
+9     2019
+10    2019
+11    2019
+12    2019
+13    2019
+14    2019
+15    2019
+16    2020
+17    2020
+18    2020
+19    2020
+20    2020
+21    2019
+22    2020
+23    2019
+24    2019
+25    2019
+26    2019
+27    2019
+28    2019
+29    2019
+Name: tweet_year, dtype: object
+df2_tweet_years = df2[(df2.tweet_year == "2019")]
+df2_tweet_years.head()
+tweet_time	tweet_text	tweet_time)	tweet_year	tweet_month
+0	2019-12-12 01:56	郭瘟鬼这个大骗子，打着换汇的幌子通过他的地下钱庄骗钱，张口就来，每天就是在炫耀自己的骗术，殊不知大家不过是在看小丑表演罢了，当诈骗犯郭瘟鬼的骗术到如今的地步，他连自己都一起骗了，整日活在自己的骗术世界里，等待着他的终归是法律的审判。 #郭文贵 https://t.co/cpcedj5WhC	2019-12-12 01:56	2019	20
+4	2019-11-05 00:59	秋 https://t.co/36ISekYyC9	2019-11-05 00:59	2019	20
+5	2019-10-29 09:25	欧冠-国米 第81分钟，埃斯波西托强行突入禁区右翼被胡梅尔斯铲倒，主裁判判罚了点球。但随后劳塔罗-马丁内斯操刀主罚，球却被布尔基神勇扑出。	2019-10-29 09:25	2019	20
+6	2019-10-18 21:21	Necessity is the mother of invention	2019-10-18 21:21	2019	20
+7	2019-09-29 08:02	只要你非常努力，总有一天你会发现，你永远无法拉近你跟有钱人的差距。生活会让你苦上一阵子，等你适应以后，再让你苦上一辈子。	2019-09-29 08:02	2019	20
+tweet_time_2019 = df2_tweet_years.groupby(['tweet_time']).count()
+tweet_time_2019
+tweet_text	tweet_time)	tweet_year	tweet_month
+tweet_time				
+2019-01-01 01:24	1	1	1	1
+2019-01-02 03:17	3	3	3	3
+2019-01-02 03:18	1	1	1	1
+2019-01-02 03:43	3	3	3	3
+2019-01-02 03:44	3	3	3	3
+...	...	...	...	...
+2019-12-31 22:25	1	1	1	1
+2019-12-31 23:43	1	1	1	1
+2019-12-31 23:47	1	1	1	1
+2019-12-31 23:49	1	1	1	1
+2019-12-31 23:52	1	1	1	1
+60088 rows × 4 columns
+
+tweet_time_2019.plot(kind='line')
+
+plt.title("Tweets by Date")
+plt.ylabel("# of Tweets (thousands)")
+plt.xlabel("Date")
+plt.legend(bbox_to_anchor=(2, 1), loc=2, borderaxespad=0.)
+
+plt.show()
