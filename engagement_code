@@ -1,0 +1,1133 @@
+Tweet Data
+### Load Programs
+import pandas as pd 
+import numpy as np
+import re 
+import string
+
+
+
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+from wordcloud import WordCloud, STOPWORDS 
+import matplotlib.pyplot as plt
+%matplotlib inline
+from PIL import Image
+from textblob import TextBlob
+import os
+import glob
+import pandas as pd
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+import pandas as pd 
+import re 
+import string 
+import nltk
+
+# Uncomment the next two lines if you miss these packages
+#nltk.download('stopwords')
+#nltk.download('punkt')
+
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+import nltk.corpus  
+from nltk import bigrams
+from nltk.text import Text 
+import itertools
+import collections
+import networkx as nx
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.cluster import KMeans
+from sklearn.decomposition import LatentDirichletAllocation
+from scipy.cluster.hierarchy import ward, dendrogram, single,complete,average,weighted,centroid,median
+from scipy.spatial.distance import pdist
+import spacy
+import math
+import numpy as np
+import pyLDAvis.gensim
+import pickle 
+import pyLDAvis
+import gensim
+from gensim.utils import simple_preprocess
+import gensim.corpora as corpora
+from gensim.models import CoherenceModel
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+%matplotlib inline
+# set PYTHONHASHSEED to have Gensim Reproducability
+%env PYTHONHASHSEED=0
+env: PYTHONHASHSEED=0
+C:\Users\ewing\anaconda33\lib\site-packages\scipy\sparse\sparsetools.py:21: DeprecationWarning: `scipy.sparse.sparsetools` is deprecated!
+scipy.sparse.sparsetools is a private module for scipy.sparse, and should not be used.
+  _deprecated()
+import spacy
+from spacy.matcher import Matcher
+from spacy.tokens import Span
+from spacy import displacy
+import pandas as pd 
+import re 
+import string 
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+import nltk.corpus  
+from nltk.text import Text  
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.cluster import KMeans
+from sklearn.decomposition import LatentDirichletAllocation
+from scipy.cluster.hierarchy import ward, dendrogram, single,complete,average,weighted,centroid,median
+from scipy.spatial.distance import pdist
+import numpy as np
+import matplotlib.cm as matcm
+from networkx.algorithms import community
+import math
+import networkx as nx
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+%matplotlib inline
+Load Data (Tweet and User Data)
+import pandas as pd
+import numpy as np
+pd.set_option('display.max_colwidth', 150)
+
+df = pd.read_csv("tweets.csv", sep=",")
+users = pd.read_csv("users.csv", sep=",")
+
+df = df.drop_duplicates(keep="first")
+users = users.drop_duplicates(keep="first")
+
+df.head(10)
+C:\Users\ewing\anaconda33\lib\site-packages\IPython\core\interactiveshell.py:3071: DtypeWarning: Columns (15) have mixed types.Specify dtype option on import or set low_memory=False.
+  has_raised = await self.run_ast_nodes(code_ast.body, cell_name,
+tweetid	userid	user_display_name	user_screen_name	user_reported_location	user_profile_description	user_profile_url	follower_count	following_count	account_creation_date	...	retweet_tweetid	latitude	longitude	quote_count	reply_count	like_count	retweet_count	hashtags	urls	user_mentions
+0	1204942993939140608	bxJj6YkM0VJO9p7DCgvAr6cONFlVPqEs0xTI9GN4U=	bxJj6YkM0VJO9p7DCgvAr6cONFlVPqEs0xTI9GN4U=	bxJj6YkM0VJO9p7DCgvAr6cONFlVPqEs0xTI9GN4U=	NaN	NaN	NaN	2	20	2019-11-24	...	NaN	absent	absent	0	1	0	0	['郭文贵']	[]	[]
+1	1214065325760757760	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	NaN	NaN	NaN	43	35	2019-12-10	...	NaN	absent	absent	0	0	0	0	[]	['https://accounts.youtube.com/accounts/SetSID?ilo=1&d9c9ca48c044dc31567ceda6d17b7b96=c33bb3ea5380ae1b873e24e0cdf93362&ils=3d10164294022ae57dce76c...	[]
+2	1214500018503045122	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	NaN	NaN	NaN	43	35	2019-12-10	...	NaN	absent	absent	0	0	0	0	[]	['https://accounts.youtube.com/accounts/SetSID?ilo=1&cd694dc649408ea31ae3484f7b72e641=9ff251241b2130b31def51ebea7db935&ils=d7107eab34c856dc5f8f18e...	[]
+3	1213994655110483970	wUM3xcnXFbFPJHCO103DLLsCZfiGZbspt7rgmNnu2Q=	wUM3xcnXFbFPJHCO103DLLsCZfiGZbspt7rgmNnu2Q=	wUM3xcnXFbFPJHCO103DLLsCZfiGZbspt7rgmNnu2Q=	NaN	NaN	NaN	35	75	2020-01-03	...	NaN	absent	absent	0	0	0	0	[]	['https://accounts.youtube.com/accounts/SetSID?ilo=1&f9c855d31b631eb20e56bd79a576f6ca=cb550ff58d18240d9607af13a20bf5e6&ils=4fc903257d2f371c9a329a7...	[]
+4	1191520301089116162	NnQLYb8S3Wth8rhVmxeLCChy0x3TWAt6kEpm0OxpM=	NnQLYb8S3Wth8rhVmxeLCChy0x3TWAt6kEpm0OxpM=	NnQLYb8S3Wth8rhVmxeLCChy0x3TWAt6kEpm0OxpM=	NaN	NaN	NaN	24	0	2019-10-23	...	NaN	absent	absent	0	0	0	0	[]	[]	[]
+5	1189111080473120770	O0ZVD+IRqLqPHpZ46g4ie0Hos1GJtNYE5C36+stl85E=	O0ZVD+IRqLqPHpZ46g4ie0Hos1GJtNYE5C36+stl85E=	O0ZVD+IRqLqPHpZ46g4ie0Hos1GJtNYE5C36+stl85E=	NaN	NaN	NaN	0	1	2019-10-18	...	NaN	absent	absent	0	0	0	0	[]	[]	[]
+6	1185304968196059137	R0Slx3hL3ZJu5kyyPGACZ4pDv3S7hjAXAJt1a5l+1k=	R0Slx3hL3ZJu5kyyPGACZ4pDv3S7hjAXAJt1a5l+1k=	R0Slx3hL3ZJu5kyyPGACZ4pDv3S7hjAXAJt1a5l+1k=	NaN	NaN	NaN	0	7	2019-09-26	...	NaN	absent	absent	0	0	0	0	[]	[]	[]
+7	1178218403330326529	Nc7pmwnZpgdJUVenZRJUUzKNHXRlk7PjZA6ZyyhJQg=	Nc7pmwnZpgdJUVenZRJUUzKNHXRlk7PjZA6ZyyhJQg=	Nc7pmwnZpgdJUVenZRJUUzKNHXRlk7PjZA6ZyyhJQg=	NaN	NaN	NaN	0	0	2019-08-26	...	NaN	absent	absent	0	0	0	0	[]	[]	[]
+8	1178570957620797440	2zU9t201ThqlVkyUv1EkIyckzaX3SpGTT3Q58RRY=	2zU9t201ThqlVkyUv1EkIyckzaX3SpGTT3Q58RRY=	2zU9t201ThqlVkyUv1EkIyckzaX3SpGTT3Q58RRY=	NaN	A crying girl	NaN	0	3	2019-07-23	...	NaN	absent	absent	0	0	0	0	[]	[]	[]
+9	1171676483892342785	2zU9t201ThqlVkyUv1EkIyckzaX3SpGTT3Q58RRY=	2zU9t201ThqlVkyUv1EkIyckzaX3SpGTT3Q58RRY=	2zU9t201ThqlVkyUv1EkIyckzaX3SpGTT3Q58RRY=	NaN	A crying girl	NaN	0	3	2019-07-23	...	NaN	absent	absent	0	0	0	0	[]	[]	[]
+10 rows × 30 columns
+
+df.info()
+<class 'pandas.core.frame.DataFrame'>
+Int64Index: 348608 entries, 0 to 348607
+Data columns (total 30 columns):
+ #   Column                    Non-Null Count   Dtype  
+---  ------                    --------------   -----  
+ 0   tweetid                   348608 non-null  int64  
+ 1   userid                    348608 non-null  object 
+ 2   user_display_name         348608 non-null  object 
+ 3   user_screen_name          348608 non-null  object 
+ 4   user_reported_location    17276 non-null   object 
+ 5   user_profile_description  41843 non-null   object 
+ 6   user_profile_url          941 non-null     object 
+ 7   follower_count            348608 non-null  int64  
+ 8   following_count           348608 non-null  int64  
+ 9   account_creation_date     348608 non-null  object 
+ 10  account_language          348608 non-null  object 
+ 11  tweet_language            348608 non-null  object 
+ 12  tweet_text                348608 non-null  object 
+ 13  tweet_time                348608 non-null  object 
+ 14  tweet_client_name         348608 non-null  object 
+ 15  in_reply_to_userid        80274 non-null   object 
+ 16  in_reply_to_tweetid       79301 non-null   float64
+ 17  quoted_tweet_tweetid      4480 non-null    float64
+ 18  is_retweet                348608 non-null  bool   
+ 19  retweet_userid            75853 non-null   object 
+ 20  retweet_tweetid           182002 non-null  float64
+ 21  latitude                  348608 non-null  object 
+ 22  longitude                 348608 non-null  object 
+ 23  quote_count               348608 non-null  int64  
+ 24  reply_count               348608 non-null  int64  
+ 25  like_count                348608 non-null  int64  
+ 26  retweet_count             348608 non-null  int64  
+ 27  hashtags                  348608 non-null  object 
+ 28  urls                      348608 non-null  object 
+ 29  user_mentions             348608 non-null  object 
+dtypes: bool(1), float64(3), int64(7), object(19)
+memory usage: 80.1+ MB
+Exploratory
+### Find Most Liked Tweets
+most_liked_df = df.sort_values(by='like_count', ascending=False)
+most_liked_df = most_liked_df[['tweetid','tweet_text', 'urls', 'like_count', 'tweet_language']]
+most_liked_df.head(20)
+tweetid	tweet_text	urls	like_count	tweet_language
+13887	1245910634731978753	#香港Fully support the Hong Kong Police Force to enforce laws strictly, stop riots and control chaos, maintain Hong Kong's safety and stability, and...	[]	3718	en
+3424	1247363676660568065	#香港 纪念香港基本法颁布30周年-不忘初心、行稳致远 https://t.co/mThf0SV1qR	[]	3213	zh
+326582	1239809215427784705	#郭文贵 life is becoming more and more difficult. The legal fund has changed to cheat and cheat. #郭文贵 will end up with nothing. #郭文贵 https://t.co/NiO...	[]	675	en
+204460	1241212645467754496	#香港Hong Kong, once an international financial center, has a vibrant and good atmosphere. It has a spiritual core of "freedom, equality,#香港 and the...	[]	652	en
+341817	1249896087151771648	#新冠疫情 #USAVirus Viruses have no borders. It's a global battle. No one can survive. No country can survive alone. #新冠肺炎 https://t.co/QoB25wSucI	['https://www.youtube.com/watch?v=n8jIin_rD7M']	646	en
+196545	1244837229756690434	#香港 #香港 #香港 Don't go too far as a bad reporter from RTHK. Spread false information all day long. Where is your professional ethics? https://t.co/A...	[]	621	en
+13407	1245159927401697280	#香港 In the current epidemic situation, 香港the heart of thieves remains unchanged #香港 https://t.co/gvJ44evgS8	[]	577	en
+16772	1245547871903965189	#病毒 #肺炎 Congratulations to the medical staff for their triumphant return. You are the greatest heroes.#病毒 #肺炎 https://t.co/YStXayM2Ub	[]	575	en
+322602	1244831133281312769	#病毒 #肺炎 Victory belongs to us. #病毒 #肺炎\nhttps://t.co/OKTGQz42M7	[]	565	en
+328495	1245189088019222529	#香港 The epidemic can be isolated and prevented, 香港 but thugs are difficult to prevent. #香港 \n https://t.co/6TwjoGbPiw	[]	543	en
+326909	1239801501574262785	For Guo Wengui, these promises will be broken after all. little ants will find that all these are dreams after all。 #郭文贵 https://t.co/NjTVnHCKkx	[]	531	en
+52211	1246645440415580161	#香港 No education can match adversity.#香港 https://t.co/5Qc4bCQC5n	[]	523	en
+2906	1240169201425235969	#郭文贵 My grass, the merciless swindler, has come to an end.#郭文贵 We are waiting to see your play.#郭文贵 https://t.co/V1XgTPCHiN	[]	504	en
+339303	1241190868268101632	MilesGuo's lies can indeed be printed, but even if they are publicized, they are still lies, and the dark can never look directly at the sun. #郭文贵...	[]	503	en
+174568	1247370292592140290	#新冠肺炎 China understands the tough time the U.S. is going through and would like to provide support within its capacity.#新冠肺炎 Cooperation is the on...	[]	487	en
+196556	1248452378451267585	#新冠疫情 Conveying the wrong information will only lead to the credibility crisis of the U.S. government and further tear the public opinion in the...	['https://www.youtube.com/watch?v=qyvG66YHERg&t=53s']	461	en
+320402	1219433530037395457	反修例運動係長達半年後，雖然好似近期趨近尾聲，但昵場風暴導致嘅嚴重後果早已使市民苦不堪言。#香港 https://t.co/2l28xez4GF	[]	454	zh
+18987	1248811973615075329	##USAVirus COVID19 In front of the epidemic, we have no choice but to take responsibility. #USAVirus Only when people all over the world unite and...	[]	453	en
+72044	1243043930406391810	#香港\n#香港\n#香港\nWhat is the foundation of the private press conference when participating in the election of functional groups of the Legislative C...	[]	452	en
+214096	1247732824326590464	#新冠疫情 Coming together, fight the virus, #新冠疫情 come on CHINA, come on #新冠疫情\nhttps://t.co/G3kfANMnaq	[]	449	en
+df1 = df[['tweetid','tweet_text', 'urls', 'like_count']]
+df_urls = df1[(df1.urls != "[]")]
+sorted_df_urls = df_urls.sort_values(by='like_count', ascending=False)
+sorted_df_urls.head(5)
+tweetid	tweet_text	urls	like_count
+341817	1249896087151771648	#新冠疫情 #USAVirus Viruses have no borders. It's a global battle. No one can survive. No country can survive alone. #新冠肺炎 https://t.co/QoB25wSucI	['https://www.youtube.com/watch?v=n8jIin_rD7M']	646
+196556	1248452378451267585	#新冠疫情 Conveying the wrong information will only lead to the credibility crisis of the U.S. government and further tear the public opinion in the...	['https://www.youtube.com/watch?v=qyvG66YHERg&t=53s']	461
+300655	1249172783973744640	#新冠肺炎 COVID19 In front of the epidemic, we have no choice but to take responsibility.#新冠肺炎 #新冠病毒 #共抗肺炎 #USAVirus #CoronavirusOutbreak\nhttps://t....	['https://www.mingjingnews.com/blog/136990']	440
+930	1219794968987914240	眼看他起高楼，眼看他宴宾客，眼看他楼塌了。 #郭文贵 一生算计，一生行骗，有过辉煌，也有过惆怅，但终了，一生犹如镜花水月，一场空。金鼠之年，坐等作恶多端的 #郭文贵 “楼塌了”。届时， #郭文贵 必将“尸骨无存”。https://t.co/7NVR6GdCa1	['https://www.youtube.com/watch?v=MYQKImmiin8']	438
+176016	1220530044059078656	歷時半年幾嘅反修例示威運動，帶來乜嘢大家有目共睹。我唸，每個市民一定心中都有把秤，衡量一下香港係唔係實現暴徒所講嘅自由。https://t.co/pdzzHSReS7	['https://www.youtube.com/watch?v=WH98AnnqheE&feature=youtu.be']	398
+Change DType to STR
+df['user_reported_locaton'] = df['user_reported_location'].astype(str)
+df['tweet_text'] = df['tweet_text'].astype(str)
+df['tweet_language'] = df['tweet_language'].astype(str)
+State Linked Operatives Commonly Tweet in Which Language?
+df['tweet_language'].value_counts()
+zh     274534
+en      32926
+und     15853
+ja      13702
+ru       6255
+tr       1177
+ko        592
+ar        588
+es        561
+in        350
+fr        342
+pt        332
+tl        157
+uk        120
+de        104
+et         97
+nl         90
+it         81
+th         78
+ht         77
+no         74
+fi         57
+eu         50
+pl         44
+cs         42
+sv         38
+bg         38
+da         37
+cy         32
+ro         25
+hi         21
+fa         18
+is         17
+vi         17
+ca         16
+hu         15
+lv         13
+lt         13
+sr          8
+sl          6
+iw          5
+bo          3
+ta          2
+kn          1
+Name: tweet_language, dtype: int64
+Although Tweets Occur in a Number of Languages, Accounts Are Created/Set to Only A Few
+Note:
+
+zh-cn = Mainland China Chinese zh-tw = Taiwanese Chinese
+
+user_accounts_by_language = users[users["account_language"] != "und"]
+user_accounts_by_language = users["account_language"].value_counts().sort_values()
+user_accounts_by_language
+ja           1
+en-gb        3
+tr          12
+zh-CN       14
+ru         354
+zh-tw      374
+zh-cn     2384
+en       20608
+Name: account_language, dtype: int64
+Pre-Process, Create New Cols for Cleaned Data
+import re
+df["urls"] = df.tweet_text.apply(lambda x: re.findall("https://[A-Za-z0-9\./_]+", x))
+df["user_mentions"] = df.tweet_text.apply(lambda x: re.findall("@[A-Za-z0-9_]+", x))
+df["hashtags"] = df.tweet_text.apply(lambda x: re.findall("#[A-Za-z0-9_]+", x))
+df["tweet_text_nourl"] = df.tweet_text.str.replace("https://[A-Za-z0-9\./_]+", "")
+df["text_splits"] = df.tweet_text.str.split()
+
+df.head(3)
+<>:2: DeprecationWarning: invalid escape sequence \.
+<>:5: DeprecationWarning: invalid escape sequence \.
+<>:2: DeprecationWarning: invalid escape sequence \.
+<>:5: DeprecationWarning: invalid escape sequence \.
+<ipython-input-89-bcf49b2c52bd>:2: DeprecationWarning: invalid escape sequence \.
+  df["urls"] = df.tweet_text.apply(lambda x: re.findall("https://[A-Za-z0-9\./_]+", x))
+<ipython-input-89-bcf49b2c52bd>:5: DeprecationWarning: invalid escape sequence \.
+  df["tweet_text_nourl"] = df.tweet_text.str.replace("https://[A-Za-z0-9\./_]+", "")
+tweetid	userid	user_display_name	user_screen_name	user_reported_location	user_profile_description	user_profile_url	follower_count	following_count	account_creation_date	...	quote_count	reply_count	like_count	retweet_count	hashtags	urls	user_mentions	user_reported_locaton	tweet_text_nourl	text_splits
+0	1204942993939140608	bxJj6YkM0VJO9p7DCgvAr6cONFlVPqEs0xTI9GN4U=	bxJj6YkM0VJO9p7DCgvAr6cONFlVPqEs0xTI9GN4U=	bxJj6YkM0VJO9p7DCgvAr6cONFlVPqEs0xTI9GN4U=	NaN	NaN	NaN	2	20	2019-11-24	...	0	1	0	0	[]	[https://t.co/cpcedj5WhC]	[]	nan	郭瘟鬼这个大骗子，打着换汇的幌子通过他的地下钱庄骗钱，张口就来，每天就是在炫耀自己的骗术，殊不知大家不过是在看小丑表演罢了，当诈骗犯郭瘟鬼的骗术到如今的地步，他连自己都一起骗了，整日活在自己的骗术世界里，等待着他的终归是法律的审判。 #郭文贵	[郭瘟鬼这个大骗子，打着换汇的幌子通过他的地下钱庄骗钱，张口就来，每天就是在炫耀自己的骗术，殊不知大家不过是在看小丑表演罢了，当诈骗犯郭瘟鬼的骗术到如今的地步，他连自己都一起骗了，整日活在自己的骗术世界里，等待着他的终归是法律的审判。, #郭文贵, https://t.co/cpcedj5WhC]
+1	1214065325760757760	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	NaN	NaN	NaN	43	35	2019-12-10	...	0	0	0	0	[]	[https://t.co/hNm6nUAiE3]	[]	nan		[https://t.co/hNm6nUAiE3]
+2	1214500018503045122	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	NaN	NaN	NaN	43	35	2019-12-10	...	0	0	0	0	[]	[https://t.co/UKuYfubjgh]	[]	nan		[https://t.co/UKuYfubjgh]
+3 rows × 33 columns
+
+ 
+Create DF for Top 4 Popular Languages (Chinese, English, Japanese, Russian)
+df_popular_languages = df[(df.tweet_language == "zh") | (df.tweet_language == "en") | (df.tweet_language == "ja") | (df.tweet_language == "ru")]
+dfpl = df_popular_languages[["tweetid", "userid", "user_reported_location", "tweet_language","tweet_text", 
+                             "tweet_time", "follower_count", "following_count", "account_creation_date", 
+                             "reply_count", "like_count", "retweet_count", "latitude", "longitude",
+                             "tweet_time", "account_language", "hashtags"]]
+dfpl.head(3)
+tweetid	userid	user_reported_location	tweet_language	tweet_text	tweet_time	follower_count	following_count	account_creation_date	reply_count	like_count	retweet_count	latitude	longitude	tweet_time	account_language	hashtags
+0	1204942993939140608	bxJj6YkM0VJO9p7DCgvAr6cONFlVPqEs0xTI9GN4U=	NaN	zh	郭瘟鬼这个大骗子，打着换汇的幌子通过他的地下钱庄骗钱，张口就来，每天就是在炫耀自己的骗术，殊不知大家不过是在看小丑表演罢了，当诈骗犯郭瘟鬼的骗术到如今的地步，他连自己都一起骗了，整日活在自己的骗术世界里，等待着他的终归是法律的审判。 #郭文贵 https://t.co/cpcedj5WhC	2019-12-12 01:56	2	20	2019-11-24	1	0	0	absent	absent	2019-12-12 01:56	en	[]
+4	1191520301089116162	NnQLYb8S3Wth8rhVmxeLCChy0x3TWAt6kEpm0OxpM=	NaN	ja	秋 https://t.co/36ISekYyC9	2019-11-05 00:59	24	0	2019-10-23	0	0	0	absent	absent	2019-11-05 00:59	en	[]
+5	1189111080473120770	O0ZVD+IRqLqPHpZ46g4ie0Hos1GJtNYE5C36+stl85E=	NaN	zh	欧冠-国米 第81分钟，埃斯波西托强行突入禁区右翼被胡梅尔斯铲倒，主裁判判罚了点球。但随后劳塔罗-马丁内斯操刀主罚，球却被布尔基神勇扑出。	2019-10-29 09:25	0	1	2019-10-18	0	0	0	absent	absent	2019-10-29 09:25	en	[]
+### Load Library for Plotly Graphing
+import pandas as pd
+import numpy as np
+%matplotlib inline
+from plotly import __version__
+from plotly.offline import download_plotlyjs, init_notebook_mode, plot, iplot
+import cufflinks as cf
+init_notebook_mode(connected=True)
+cf.go_offline()
+Engagement Metrics
+Tweets by Language
+num_tweets_by_language = dfpl["tweet_language"].value_counts().sort_values()
+num_tweets_by_language
+ru      6255
+ja     13702
+en     32926
+zh    274534
+Name: tweet_language, dtype: int64
+num_tweets_by_language = num_tweets_by_language.to_frame().reset_index()
+num_tweets_by_language = num_tweets_by_language.rename(columns= {0: 'Values'})
+num_tweets_by_language.index.name = 'language'
+num_tweets_by_language
+index	tweet_language
+language		
+0	ru	6255
+1	ja	13702
+2	en	32926
+3	zh	274534
+num_tweets_by_language.iplot(kind='bar',x='index',y='tweet_language')
+Replies by Tweet Language
+We can asee that There is much more interaction on Chinese Language Tweets compared to the others
+
+num_tweets_by_language = dfpl["tweet_language"].value_counts().sort_values()
+num_tweets_by_language
+ru      6255
+ja     13702
+en     32926
+zh    274534
+Name: tweet_language, dtype: int64
+rep_by_language = dfpl.groupby(['tweet_language'])['reply_count'].sum().sort_values()
+rep_by_language
+tweet_language
+ru       374
+ja      1655
+en      4980
+zh    122719
+Name: reply_count, dtype: int64
+rep_by_language = rep_by_language.to_frame().reset_index()
+
+rep_by_language = rep_by_language.rename(columns= {0: 'Values'})
+rep_by_language.index.name = 'index'
+rep_by_language
+tweet_language	reply_count
+index		
+0	ru	374
+1	ja	1655
+2	en	4980
+3	zh	122719
+rep_by_language.iplot(kind='bar',x='tweet_language',y='reply_count')
+Ratio of replies to tweets
+num_tweets_by_language = dfpl["tweet_language"].value_counts().sort_values()
+num_tweets_by_language
+ru      6255
+ja     13702
+en     32926
+zh    274534
+Name: tweet_language, dtype: int64
+### Understandably, a lot of activity with Chinese users.  
+
+### Russian activity is low in terms of replies, but likes are used pretty frequently
+x = rep_by_language / num_tweets_by_language
+x
+tweet_language
+ru    0.059792
+ja    0.120785
+en    0.151248
+zh    0.447008
+dtype: float64
+x = x.to_frame().reset_index()
+
+x = x.rename(columns= {0: 'Values'})
+x.index.name = 'index'
+x
+tweet_language	Values
+index		
+0	ru	0.059792
+1	ja	0.120785
+2	en	0.151248
+3	zh	0.447008
+x.iplot(kind='bar',x='tweet_language',y='Values')
+Likes by Language
+num_tweets_by_language = dfpl["tweet_language"].value_counts().sort_values()
+num_tweets_by_language
+ru      6255
+ja     13702
+en     32926
+zh    274534
+Name: tweet_language, dtype: int64
+likes_by_language = dfpl.groupby(['tweet_language'])['like_count'].sum().sort_values()
+likes_by_language
+tweet_language
+ja      971
+ru     3225
+zh    46600
+en    77220
+Name: like_count, dtype: int64
+### Ratio of likes to number of tweets by language
+
+
+### Crazy activity coming from English tweets.  Wonder if it is in regards to one specific topic/timeframe
+ratio_likes = likes_by_language / num_tweets_by_language
+ratio_likes = ratio_likes.to_frame().reset_index()
+
+ratio_likes = ratio_likes.rename(columns= {0: 'Values'})
+ratio_likes.index.name = 'Index'
+ratio_likes
+index	Values
+Index		
+0	en	2.345259
+1	ja	0.070866
+2	ru	0.515588
+3	zh	0.169742
+ratio_likes.iplot(kind='bar',x='index',y='Values')
+Retweets by language
+num_tweets_by_language = dfpl["tweet_language"].value_counts().sort_values()
+num_tweets_by_language
+ru      6255
+ja     13702
+en     32926
+zh    274534
+Name: tweet_language, dtype: int64
+rt_by_language = dfpl.groupby(['tweet_language'])['retweet_count'].sum().sort_values()
+rt_by_language
+tweet_language
+ja     234
+ru     242
+en     967
+zh    9286
+Name: retweet_count, dtype: int64
+### Ratio of rt's by tweet language
+
+### Strange seeing the Russian activity being so high
+
+
+### English language tweets are heavily liked, but not much interaction in terms of rt's
+rt_ratio = rt_by_language / num_tweets_by_language
+rt_ratio = rt_ratio.to_frame().reset_index()
+
+rt_ratio = rt_ratio.rename(columns= {0: 'Values'})
+rt_ratio.index.name = 'Index'
+rt_ratio
+index	Values
+Index		
+0	en	0.029369
+1	ja	0.017078
+2	ru	0.038689
+3	zh	0.033825
+rt_ratio.iplot(kind='bar',x='index',y='Values')
+followers by tweet language
+num_tweets_by_language = dfpl["tweet_language"].value_counts().sort_values()
+num_tweets_by_language
+ru      6255
+ja     13702
+en     32926
+zh    274534
+Name: tweet_language, dtype: int64
+dfpl.groupby(['tweet_language'])['follower_count'].sum().sort_values()
+tweet_language
+ja     108460
+ru     618094
+en     758017
+zh    1478600
+Name: follower_count, dtype: int64
+Number of accounts registered per each language
+Crazy how much interaction/activity is being produced by Japanese Language accounts
+
+dfpl["account_language"].value_counts().sort_values()
+ja           10
+en-gb        19
+tr          286
+zh-CN      2045
+ru        10730
+zh-tw     11402
+zh-cn     62461
+en       240464
+Name: account_language, dtype: int64
+Creating New DF for each language
+df_en = dfpl[dfpl.tweet_language == "en"]
+df_zh = dfpl[dfpl.tweet_language == "zh"]
+df_jp = dfpl[dfpl.tweet_language == "ja"]
+df_ru = dfpl[dfpl.tweet_language == "ru"]
+df_tr = dfpl[dfpl.tweet_language == "tr"]
+---------------------------------------------------------------------------
+NameError                                 Traceback (most recent call last)
+<ipython-input-10-70ad79831a70> in <module>
+----> 1 df_en = dfpl[dfpl.tweet_language == "en"]
+      2 df_zh = dfpl[dfpl.tweet_language == "zh"]
+      3 df_jp = dfpl[dfpl.tweet_language == "ja"]
+      4 df_ru = dfpl[dfpl.tweet_language == "ru"]
+      5 df_tr = dfpl[dfpl.tweet_language == "tr"]
+
+NameError: name 'dfpl' is not defined
+Saving English Tweets and Chinese Tweets as CSV
+df_en.to_csv('english_tweets.csv') 
+df_zh.to_csv('chinese_tweets.csv') 
+### Change dtype to string
+df_en['tweet_text'] = df_en['tweet_text'].astype(str)
+df_zh['tweet_text'] = df_zh['tweet_text'].astype(str)
+df_jp['tweet_text'] = df_jp['tweet_text'].astype(str)
+df_ru['tweet_text'] = df_ru['tweet_text'].astype(str)
+df_tr['tweet_text'] = df_tr['tweet_text'].astype(str)
+English Tweets Data Processing
+def TweetPreprocessing(text): 
+    # get lowercase
+    text = text.lower()
+    # remove numbers    # remove numbers
+
+    text = re.sub(r'\d+', '', text)
+    # remove urls
+    text = re.sub(r'^https?:\/\/.*[\r\n]*', '', text)
+    # remove punctuation
+    text = text.translate(text.maketrans('', '', string.punctuation))
+    # strip whitespace
+    text = text.strip()
+    # remove stop words
+    stop_words = stopwords.words('english')
+    newStopWords = ['html','rt', 'good', 'new', 'day', 'like', 'come', '郭文贵','香港']
+    stop_words.extend(newStopWords)
+    stop_words = set(stop_words)
+    tokens = word_tokenize(text)
+    words = [w for w in tokens if not w in stop_words]
+    text = " ".join(w for w in words)
+    text = text.replace('unitedstates', 'united states')
+    text = text.replace('figures', 'figure')
+    text = text.replace('hong kong', 'hongkong')
+
+    return text
+Most Commonly Used Words
+posts = df_en.tweet_text.values
+# preprocess posts
+
+processed_posts = [TweetPreprocessing(text) for text in posts]
+# Find frequent words and Generate word and frequency list
+
+vectorizer = CountVectorizer(stop_words='english', lowercase = True) 
+# Now X is the document-term matrix. 
+
+x = vectorizer.fit_transform(processed_posts)
+sum_words = x.sum(axis=0) 
+words_freq = [(word, sum_words[0, idx]) for word, idx in vectorizer.vocabulary_.items()]
+words_freq =sorted(words_freq, key = lambda x: x[1], reverse=True)
+words_freq[:20]
+[('milesguo', 6603),
+ ('hongkong', 3030),
+ ('肺炎', 2771),
+ ('病毒', 2417),
+ ('guo', 1909),
+ ('people', 1650),
+ ('epidemic', 1502),
+ ('wengui', 1286),
+ ('world', 1272),
+ ('china', 1204),
+ ('time', 970),
+ ('covid', 890),
+ ('money', 880),
+ ('life', 776),
+ ('make', 721),
+ ('believe', 681),
+ ('virus', 666),
+ ('long', 659),
+ ('live', 649),
+ ('love', 646)]
+Word Cloud Creation
+posts = df_en.tweet_text.values
+text = " ".join(t for t in posts)
+# preprocess text
+processed_text = TweetPreprocessing(text)
+wordcloud = WordCloud( max_font_size=100, max_words=100, width = 400, height = 200, 
+                      scale = 6, collocations=False).generate(processed_text)
+plt.figure(figsize=(12, 6))
+plt.imshow(wordcloud, interpolation="bilinear")
+plt.axis("off")
+plt.show()
+
+#  change a background color
+wordcloud = WordCloud( max_font_size=100, max_words=100, width = 400, height = 200, background_color = 'white',
+                      scale = 6, collocations=False).generate(processed_text)
+plt.figure(figsize=(12, 6))
+plt.imshow(wordcloud, interpolation="bilinear")
+plt.axis("off")
+plt.show()
+
+Bi-grams to Analyze Word Usage
+words_in_post = [post.lower().split() for post in processed_posts]
+posts = [[word for word in post_words] for post_words in words_in_post]
+
+# Create list of lists containing bigrams in posts
+terms_bigram = [list(bigrams(post)) for post in posts]
+terms_bigram[2]
+[('肺炎', '病毒'),
+ ('病毒', 'priceless'),
+ ('priceless', 'life'),
+ ('life', 'victim'),
+ ('victim', 'politicians'),
+ ('politicians', 'pursuit'),
+ ('pursuit', 'political'),
+ ('political', 'demands'),
+ ('demands', 'interests'),
+ ('interests', 'httpstcomczlwncxu')]
+bigrams = list(itertools.chain(*terms_bigram))
+
+
+bigram_counts = collections.Counter(bigrams)
+
+bigram_df = pd.DataFrame(bigram_counts.most_common(20),columns=['bigram', 'count'])
+bigram_df
+bigram	count
+0	(guo, wengui)	1083
+1	(病毒, 肺炎)	735
+2	(肺炎, 病毒)	637
+3	(guo, wenguis)	419
+4	(united, states)	388
+5	(milesguo, guo)	298
+6	(work, together)	267
+7	(milesguo, milesguo)	267
+8	(fight, epidemic)	207
+9	(rule, law)	203
+10	(肺炎, covid)	192
+11	(wen, gui)	181
+12	(hongkong, people)	162
+13	(milesguo, liars)	159
+14	(liars, also)	159
+15	(also, group)	159
+16	(group, evil)	159
+17	(evil, liars郭文贵)	159
+18	(liars郭文贵, milesguo)	159
+19	(hongkong, police)	151
+# Create dictionary of bigrams and their counts
+d = bigram_df.set_index('bigram').T.to_dict('records')
+G = nx.Graph()
+
+# Create connections between nodes
+for k, v in d[0].items():
+    G.add_edge(k[0], k[1], weight=(v * 10))
+fig, ax = plt.subplots(figsize=(12, 10))
+
+pos = nx.spring_layout(G, k=2)
+
+# Plot networks
+nx.draw_networkx(G, pos,
+                 font_size=16,
+                 width=3,
+                 edge_color='grey',
+                 node_color='yellow',
+                 with_labels = True,
+                 ax=ax)
+    
+plt.show()
+C:\Users\ewing\anaconda33\lib\site-packages\matplotlib\backends\backend_agg.py:214: RuntimeWarning:
+
+Glyph 30149 missing from current font.
+
+C:\Users\ewing\anaconda33\lib\site-packages\matplotlib\backends\backend_agg.py:214: RuntimeWarning:
+
+Glyph 27602 missing from current font.
+
+C:\Users\ewing\anaconda33\lib\site-packages\matplotlib\backends\backend_agg.py:214: RuntimeWarning:
+
+Glyph 32954 missing from current font.
+
+C:\Users\ewing\anaconda33\lib\site-packages\matplotlib\backends\backend_agg.py:214: RuntimeWarning:
+
+Glyph 28814 missing from current font.
+
+C:\Users\ewing\anaconda33\lib\site-packages\matplotlib\backends\backend_agg.py:214: RuntimeWarning:
+
+Glyph 37101 missing from current font.
+
+C:\Users\ewing\anaconda33\lib\site-packages\matplotlib\backends\backend_agg.py:214: RuntimeWarning:
+
+Glyph 25991 missing from current font.
+
+C:\Users\ewing\anaconda33\lib\site-packages\matplotlib\backends\backend_agg.py:214: RuntimeWarning:
+
+Glyph 36149 missing from current font.
+
+C:\Users\ewing\anaconda33\lib\site-packages\matplotlib\backends\backend_agg.py:183: RuntimeWarning:
+
+Glyph 30149 missing from current font.
+
+C:\Users\ewing\anaconda33\lib\site-packages\matplotlib\backends\backend_agg.py:183: RuntimeWarning:
+
+Glyph 27602 missing from current font.
+
+C:\Users\ewing\anaconda33\lib\site-packages\matplotlib\backends\backend_agg.py:183: RuntimeWarning:
+
+Glyph 32954 missing from current font.
+
+C:\Users\ewing\anaconda33\lib\site-packages\matplotlib\backends\backend_agg.py:183: RuntimeWarning:
+
+Glyph 28814 missing from current font.
+
+C:\Users\ewing\anaconda33\lib\site-packages\matplotlib\backends\backend_agg.py:183: RuntimeWarning:
+
+Glyph 37101 missing from current font.
+
+C:\Users\ewing\anaconda33\lib\site-packages\matplotlib\backends\backend_agg.py:183: RuntimeWarning:
+
+Glyph 25991 missing from current font.
+
+C:\Users\ewing\anaconda33\lib\site-packages\matplotlib\backends\backend_agg.py:183: RuntimeWarning:
+
+Glyph 36149 missing from current font.
+
+
+# we set max_features = 30 to show the first 30 most frequent terms
+max_terms = 30
+vectorizer = CountVectorizer(max_features=max_terms, stop_words='english', lowercase = True)
+x = vectorizer.fit_transform(processed_posts)
+terms = vectorizer.get_feature_names()
+dt = pd.DataFrame(x.toarray().transpose(), index = vectorizer.get_feature_names() )
+# removeSparseTerms, to remove 95% of sparse, here we keep terms that appear on at lest 5% of ducuments
+dt = dt[dt.sum(axis=1) >= math.floor(0.05*dt.shape[1])]
+dist = pdist(dt)
+# These are routines for agglomerative clustering.
+# single(y):       Perform single/min/nearest linkage on the condensed distance matrix y.
+# complete(y):     Perform complete/max/farthest point linkage on a condensed distance matrix.
+# average(y):      Perform average/UPGMA linkage on a condensed distance matrix.
+# weighted(y):     Perform weighted/WPGMA linkage on the condensed distance matrix.
+# centroid(y):     Perform centroid/UPGMC linkage.
+# median(y):       Perform median/WPGMC linkage.
+# ward(y):         Perform Ward’s linkage on a condensed distance matrix.
+
+matrix = ward(dist) 
+fig, ax = plt.subplots(figsize=(15, 10)) # set size
+ax = dendrogram(matrix, orientation="top", distance_sort='descending',show_leaf_counts=True, labels=terms,color_threshold=60)
+
+plt.show()
+
+#uncomment below to save figure
+#plt.savefig('ward_clusters.png')
+---------------------------------------------------------------------------
+ValueError                                Traceback (most recent call last)
+<ipython-input-151-973c6e86c88b> in <module>
+     10 matrix = ward(dist)
+     11 fig, ax = plt.subplots(figsize=(15, 10)) # set size
+---> 12 ax = dendrogram(matrix, orientation="top", distance_sort='descending',show_leaf_counts=True, labels=terms,color_threshold=60)
+     13 
+     14 plt.show()
+
+~\anaconda33\lib\site-packages\scipy\cluster\hierarchy.py in dendrogram(Z, p, truncate_mode, color_threshold, get_leaves, orientation, labels, count_sort, distance_sort, show_leaf_counts, no_plot, no_labels, leaf_font_size, leaf_rotation, leaf_label_func, show_contracted, link_color_func, ax, above_threshold_color)
+   3276 
+   3277     if labels and Z.shape[0] + 1 != len(labels):
+-> 3278         raise ValueError("Dimensions of Z and labels must be consistent.")
+   3279 
+   3280     is_valid_linkage(Z, throw=True, name='Z')
+
+ValueError: Dimensions of Z and labels must be consistent.
+
+K-Means Clusters
+num_clusters = 4
+km = KMeans(n_clusters=num_clusters)
+km.fit(dt)
+clusters = km.labels_.tolist()
+# show terms and clusters
+clu = pd.DataFrame(list(zip(terms, clusters)), columns=['term', 'cluster'])
+clu
+term	cluster
+0	believe	2
+1	china	3
+2	chinese	1
+3	covid	2
+4	dont	0
+5	end	0
+clu.cluster.value_counts()
+2    2
+0    2
+3    1
+1    1
+Name: cluster, dtype: int64
+# to find centers
+km.cluster_centers_
+array([[0. , 0.5, 1. , ..., 0. , 0. , 0. ],
+       [0. , 0. , 0. , ..., 0. , 0. , 0. ],
+       [0. , 0. , 0. , ..., 0. , 0. , 0. ],
+       [0. , 0. , 0. , ..., 0. , 0. , 0. ]])
+from sklearn.datasets import make_blobs
+km.labels_
+array([2, 3, 1, 2, 0, 0])
+clu["cluster"] = km.labels_
+clu[["term", "cluster"]]
+term	cluster
+0	believe	2
+1	china	3
+2	chinese	1
+3	covid	2
+4	dont	0
+5	end	0
+LDA Topic Modeling
+def LDAPreprocessing(text): 
+    # get lowercase
+    text = text.lower()
+    # remove numbers    # remove numbers
+
+    text = re.sub(r'\d+', '', text)
+    # remove urls
+    text = re.sub(r'^https?:\/\/.*[\r\n]*', '', text)
+    # remove punctuation
+    text = text.translate(text.maketrans('', '', string.punctuation))
+    # strip whitespace
+    text = text.strip()
+    # remove stop words
+    stop_words = stopwords.words('english')
+    newStopWords = ['html','yet', 'im']
+    stop_words.extend(newStopWords)
+    stop_words = set(stop_words)
+    tokens = word_tokenize(text)
+    words = [w for w in tokens if not w in stop_words]
+    text = " ".join(w for w in words)
+    text = text.replace('theforceawakens', 'the force awakens')
+    text = text.replace('merchsexismproblem', 'merch sexism problem')
+
+
+    return text
+
+def lemmatization(texts, allowed_postags=['NOUN', 'ADJ', 'VERB', 'ADV']):
+    """https://spacy.io/api/annotation"""
+    # Initialize spacy 'en' model, keeping only tagger component (for efficiency)
+    nlp = spacy.load("en_core_web_sm", disable=['parser', 'ner'])
+    texts_out = []
+    for sent in texts:
+        doc = nlp(" ".join(sent)) 
+        texts_out.append([token.lemma_ for token in doc if token.pos_ in allowed_postags])
+    return texts_out
+def sent_to_words(sentences):
+    for sentence in sentences:
+        yield(gensim.utils.simple_preprocess(str(sentence), deacc=True))  # deacc=True removes punctuations
+posts = df_en.tweet_text.values
+# preprocess posts
+processed_posts = [TweetPreprocessing(text) for text in posts]
+posts_words = list(sent_to_words(processed_posts))
+print(posts_words[0])
+['necessity', 'mother', 'invention']
+# Do lemmatization keeping only noun, adj, vb, adv
+posts_lemmatized = lemmatization(posts_words, allowed_postags=['NOUN', 'ADJ', 'VERB', 'ADV'])
+print(posts_lemmatized[0])
+['necessity', 'mother', 'invention']
+# Create Dictionary
+id2word = corpora.Dictionary(posts_lemmatized)
+# Create Corpus
+texts = posts_lemmatized
+# Term Document Frequency
+corpus = [id2word.doc2bow(text) for text in texts]
+# View
+print(corpus[0])
+[(0, 1), (1, 1), (2, 1)]
+# Build LDA model
+# chunksize (int, optional) – Number of documents to be used in each training chunk.
+# passes (int, optional) – Number of passes through the corpus during training.
+
+lda_model = gensim.models.LdaMulticore(corpus=corpus,
+                                       id2word=id2word,
+                                       num_topics=6, 
+                                       random_state=100,
+                                       chunksize=100,
+                                       passes=10,
+                                       per_word_topics=True)
+# Print the Keyword in the 10 topics
+print(lda_model.print_topics())
+[(0, '0.024*"believe" + 0.017*"people" + 0.013*"thank" + 0.012*"support" + 0.012*"lie" + 0.012*"still" + 0.010*"word" + 0.010*"police" + 0.009*"government" + 0.009*"world"'), (1, '0.017*"money" + 0.016*"time" + 0.013*"become" + 0.013*"love" + 0.012*"end" + 0.011*"make" + 0.011*"ant" + 0.010*"go" + 0.009*"also" + 0.008*"know"'), (2, '0.019*"let" + 0.017*"say" + 0.014*"live" + 0.013*"beat" + 0.009*"lie" + 0.009*"great" + 0.008*"cheat" + 0.008*"face" + 0.007*"small" + 0.007*"right"'), (3, '0.030*"epidemic" + 0.025*"fight" + 0.023*"world" + 0.014*"see" + 0.014*"together" + 0.014*"rumor" + 0.013*"country" + 0.013*"well" + 0.009*"virus" + 0.009*"really"'), (4, '0.014*"go" + 0.012*"year" + 0.011*"know" + 0.011*"take" + 0.010*"make" + 0.009*"get" + 0.007*"start" + 0.007*"life" + 0.007*"say" + 0.007*"may"'), (5, '0.023*"people" + 0.016*"violence" + 0.015*"need" + 0.013*"make" + 0.013*"thing" + 0.011*"work" + 0.010*"law" + 0.009*"must" + 0.009*"protect" + 0.009*"always"')]
+# Compute Coherence Score
+coherence_model_lda = CoherenceModel(model=lda_model, texts=posts_lemmatized, dictionary=id2word, coherence='c_v')
+coherence_lda = coherence_model_lda.get_coherence()
+print('\nCoherence Score: ', coherence_lda)
+Coherence Score:  0.30206662703616477
+# put previous process into a function
+def compute_coherence_values(corpus, id2word, k, a, b):
+    
+    lda_model = gensim.models.LdaMulticore(corpus=corpus,
+                                           id2word=id2word,
+                                           num_topics=k, 
+                                           random_state=100,
+                                           chunksize=100,
+                                           passes=10,
+                                           alpha=a,
+                                           eta=b,
+                                           per_word_topics=True)
+    
+    coherence_model_lda = CoherenceModel(model=lda_model, texts=posts_lemmatized, dictionary=id2word, coherence='c_v')
+    
+    return coherence_model_lda.get_coherence()
+# Topics range
+min_topics = 4
+max_topics = 10
+step_size = 1
+topics_range = range(min_topics, max_topics, step_size)
+# Alpha parameter
+# this will set alpha select from (0.01, 0.31, 0.61, 0.91)
+# alpha = list(np.arange(0.01, 1, 0.3))
+alpha = list(np.arange(0.01, 1, 0.5))
+alpha.append('symmetric')
+# Beta parameter
+# this will set beta select from (0.01, 0.31, 0.61, 0.91)
+# beta = list(np.arange(0.01, 1, 0.3))
+beta = list(np.arange(0.01, 1, 0.5))
+beta.append('symmetric')
+
+num_of_docs = len(corpus)
+model_results = {'Topics': [], 'Alpha': [],'Beta': [],'Coherence': []}
+%%time 
+# Can take a long time to run
+
+# iterate through number of topics
+for k in topics_range:
+    # iterate through alpha values
+    for a in alpha:
+        # iterare through beta values
+        for b in beta:
+            # get the coherence score for the given parameters
+            cv = compute_coherence_values(corpus=corpus, id2word=id2word, 
+                                          k=k, a=a, b=b)
+            # Save the model results
+            model_results['Topics'].append(k)
+            model_results['Alpha'].append(a)
+            model_results['Beta'].append(b)
+            model_results['Coherence'].append(cv)
+
+results_df = pd.DataFrame(model_results)
+print(results_df)
+# for each topic, find the maximum coherence score and plot
+ax = results_df.groupby(['Topics'], as_index=False)['Coherence'].max().plot(x='Topics', y='Coherence', rot=0)
+results_df[results_df['Topics'] == 9 ].sort_values(by='Coherence', ascending=False)
+results_df[results_df['Topics'] == 7 ].sort_values(by='Coherence', ascending=False)
+lda_model = gensim.models.LdaMulticore(corpus=corpus,
+                                           id2word=id2word,
+                                           num_topics=9, 
+                                           random_state=100,
+                                           chunksize=100,
+                                           passes=10,
+                                           alpha=0.51,
+                                           eta=0.51)
+# Visualize the topics
+pyLDAvis.enable_notebook()
+LDAvis_prepared = pyLDAvis.gensim.prepare(lda_model, corpus, id2word)
+LDAvis_prepared
+lda_model = gensim.models.LdaMulticore(corpus=corpus,
+                                           id2word=id2word,
+                                           num_topics=7, 
+                                           random_state=100,
+                                           chunksize=100,
+                                           passes=10,
+                                           alpha='symmetric',
+                                           eta=0.51)
+# Visualize the topics
+pyLDAvis.enable_notebook()
+LDAvis_prepared = pyLDAvis.gensim.prepare(lda_model, corpus, id2word)
+LDAvis_prepared
+Chinese Tweets Data Processing
+import spacy
+nlp = spacy.load('zh_core_web_sm')
+Building prefix dict from the default dictionary ...
+Dumping model to file cache C:\Users\ewing\AppData\Local\Temp\jieba.cache
+Loading model cost 3.279 seconds.
+Prefix dict has been built successfully.
+text = [_ for _ in df_zh['tweet_text_nourl']]
+import random 
+random.choices(text, k=20)
+['RT @XinhuaChinese: 17例新型肺炎死亡病例病情公布，最小48，最大89，多有慢性病史。\n国家卫健委23日发布新型冠状病毒感染疫情最新数据，介绍17例死亡病例病情。死亡病例年龄最小48岁，最大89岁，多有既往慢性病病史，如肝硬化、粘液瘤、高血压、糖尿病、冠心病等…',
+ 'RT @AnnaleeSadler: 郭文贵用100万美元年薪雇佣已经落魄的班农为其站台，目的是想通过班农的白宫前幕僚身份，去攀附其他更高层次的美政府官员，以为申请政治庇护增加筹码。 ',
+ 'RT @fortune56234: 暴徒若繼續無視法律必然會受到法律制裁，而警方冒著生命危險執法辦案，更應該獲得香港各界力量嘅信任同支持，相信係香港行政長官林鄭月娥嘅嚴格依法施政下，香港定會重返巔峰 ',
+ '@luvmySheeran 班农一个弃臣，一个偏激的激进分子，也就只能跟文贵这样的红通逃犯同流合污了，都妄想抱大腿，可悲的组合',
+ 'RT @HycubzSjJC5XzDfIVwjEUeR7U9LsIdxcyd8MiO03Hw=: #郭文贵 法制基金从建立以来，“争取民主自由以及人权”的口号未曾改变，但从未见过一个实实在在落成的事情，从未见过一张直接晒出有出处的大额捐款单，唯一在变化翻新的就是各种骗捐诈捐花样。 ',
+ 'RT @VfDU1m70irq2eWPqr6mLX8qoIq+OxycbWuHjd6NlYU=: #护港撑警 香港骚乱已持续4月有余，乱港势力恢复今未有实质收获，不断升级的暴力活动引起香港各界对抗纭纭。四面楚歌下，乱港分子急红了眼，直接放弃了遮掩，公然与境外反动势力频频接触，相互勾连，充分暴露了他们的卖港，卖国的丑陋面目。 …',
+ '#郭文贵 #文贵 #郭骗子 现在郭文贵的妄想症已经到了疯癫的地步。他直播谎话连篇，毫无一点客观事实及逻辑常识，不仅搬弄是非还常常颠倒黑白。“上帝欲使其灭亡，必先使其疯狂”应该是郭文贵现在最真实的写照了。 ',
+ '#郭文贵 如今的文贵早已是落魄凤凰不如鸡，要钱没有，名声烂透，每次直播说来说去也就三个，一是标榜自己，二是推销基金，三是到处碰瓷。从郭媒体最近的关注就可以看出，老郭已经是江河日下，一日不如一日，相信再过不久，只有死气沉沉的僵尸粉，陪他了此残生。 ',
+ 'RT @ccAE4lJhDqYkOOpMnTP73MkUBVAJlLYgIZmHv1NQ35o=: #香港  2020年，勿使「穢色」延續，願香港嘅正義之風早日刮走籠罩嘅陰霾，香港可以重現昔日嘅和平繁榮「靚色」。 ',
+ '@Y3+7gZ2yEj1P1EZ0QE15AFXYD0tZ5b3oMNXaKg6Tc= 还香港安宁',
+ 'RT @2lxzR0KEQ6rh8YY: #王立强 诈骗“特工”王立强横空出世，到底是谁别 有用心炮制这样一个假消息，谁才是意图干涉影响台湾选举，谋取不正当选举利益，很显然蔡英文意图利用这个诈骗犯“特工”抹黑自己的竞争对手，真是无所不用其极',
+ '@CanadaKhaleesi 真是无语了，你这样的头号骗子都没接受这样的“待遇”，其他人可能吗？谁要是相信你，谁就是大傻X。',
+ 'RT @LaurieR60592428: @shawelnars 瘟龟嘅谎言无处不在，从一睁眼开始到梦里，全部都系谎言嘅生产工厂，蚂蚁们则系谎言工厂嘅工人，负责传播运送呢些谎言。前期还会有很多人关注，相信呢些谎言，认为讲嘅对，但系到后尾，大家慢慢意识到呢些多只系瘟龟呃钱嘅手段啫…',
+ '@Justin39673620 ，突然突然向人群掟催泪弹',
+ 'RT @SuzyRog10679347: #暴徒废青 #严惩暴徒\xa0#曱甴 #逃犯条例 #游行 #暴徒  #香港游行 #香港暴徒 #港独 #废青 #守护香港 #撐警行動   我哋同暴徒之間係你死我活嘅鬥爭，決唔能目光短淺、貪圖苟安，一定要立場堅決、態度鮮明。請記住，皮之不存、毛將…',
+ '郭文贵如今已经是众叛亲离，随着和班农的假合同曝光，班农对之避之不及，再加上庄烈宏的离去，郭文贵如今的蚂蚁帮就只剩猫狗两只，再也翻不起浪来。#骗子 ',
+ '“文在翻脸，贵在神速”，为私利弃战友意料之中。原本其身边的“红人”硕果仅存“小舅子”路德一人，却仍旧毫不意外地成为郭战神“翻脸”的对象。可见，在为私利毫不留情抛弃“战友亲情”的道路上，无所谓“新人旧人”郭文贵“雨露均沾”，最终收获“大满贯”。 ',
+ '世上没有绝望的处境，只有对处境绝望的人。',
+ 'RT @n80dO3nS3zzA4Cy8qFf8+H05IlQv3L1mP1doBvRE=: #香港 #暴力 反對暴力，保護香港。 ',
+ '没信心']
+from spacy.lang.zh.stop_words import STOP_WORDS
+
+print(STOP_WORDS)
+{'切', '就此', '刚巧', '～', '没有', '乃', '这么点儿', '⑨', '每个', '于是乎', '与此同时', '除外', '举凡', '过来', '如果', '嘻', '反应', '［①Ｂ］', '毫无保留地', '您是', '哎呀', '再者说', '常', '喏', '重新', '各级', '正巧', '啐', '八', '依据', '规定', '很少', '一定', '截然', '与否', '使用', '逐步', '［③］', '不问', '从严', '虽则', '不若', '>', '反手', '具体地说', '固', '下列', '按照', '千', '及其', '已', '［②⑦］', '对待', '［①⑤］', '着', '不免', '当时', '是不是', 'Ａ', 'В', '怎样', '大多', '论', '别处', '不必', '纯', '那麽', '不独', '前面', '千万', '成年', '构成', '怎奈', '接着', '请勿', '［②ｅ］', '偏偏', '打开天窗说亮话', '＞λ', '那', '多次', '扩大', '据悉', '５：０', '这边', '有利', '此中', '［①②］', '吧哒', '最近', '有些', '巴', '藉以', '极大', '好象', '单', '冒', '究竟', '`', '这里', '看起来', '9', '充其量', '过去', '你', '就地', '本身', '深入', '<', '方', '［⑤ｄ］', '近年来', '宁愿', '并排', '_', '一片', '从此以后', '坚决', '自', '赶', '何妨', '云尔', '·', '..', '保持', '绝不', '就', '从来', '顿时', '〔', '【', '何处', '明确', '除了', '正如', '个', '这种', '＝（', '一何', '迄', '人人', '自从', '掌握', '不曾', '腾', '不胜', '千万千万', '那里', '甭', '从无到有', '快要', '为此', '大概', '或则', '呸', '行动', '［④ｅ］', '如今', '相对', '［②⑩］', '归', '接下来', '周围', '而外', '每逢', '时候', '因为', '遇到', '比如说', '挨次', '充其极', '有', '毫无', '率然', '正在', '应用', '从今以后', '累次', '凝神', '昂然', '这就是说', '咱', '多多', '并非', '更进一步', '哪', '甚且', '等', '简言之', '正值', '继后', '莫如', '［②⑤］', '实现', '向使', '顺着', '且不说', '既', '乘隙', '不管怎样', '数/', '严重', '正是', '在', '宁肯', '故', '［④ｂ］', '近', '看', '来得及', '迟早', '＜±', '所以', '要是', '切莫', '出去', '［①ｈ］', '处在', '来着', '*', '某个', '最', '１２％', '＞', '定', '离', '之一', '後面', '恰逢', '方便', '应当', '莫不', '３', '何时', '关于', '庶几', '我', '开外', '从未', '］', '而论', '就要', '几时', '年复一年', '转动', '反之亦然', '一则通过', '连日来', '奇', '其中', '的确', '...................', '它们', '缕缕', '＝″', '而且', '向', '贼死', '尔等', '大体', '尽管如此', '从中', '、', '进去', '刚才', '所', '该当', '哗', '无宁', '随时', '以及', '需要', '3', '臭', '④', '只消', '只限', '挨家挨户', '巩固', '下面', '做到', '连声', '至于', '另行', '孰知', '不久', '看来', '不会', '％', '不知不觉', '不亦乐乎', '略为', '碰巧', '快', '通常', '绝', '复杂', '彼此', '维持', '并且', '不然', '怎么', 'ａ］', '莫不然', '而已', '共同', '［⑤ｂ］', '倒不如', '抑或', '不限', '从小', '每天', '③］', '之後', '省得', '次第', '具体说来', '顺', '既...又', '我们', '一般', '果然', '日复一日', '允许', '不一', '哈哈', '主张', '挨门逐户', '再则', '不满', '大大', '姑且', '据实', '或多或少', '设若', '敢于', '有力', '即便', '亲眼', '成为', '皆可', '们', '传', '一', '全然', '光', '每时每刻', '(', '自后', '加上', '不少', '呢', '乃至于', '另一方面', '向着', '〕', '假如', '当下', '总的说来', '一.', '大家', '严格', '愿意', '［②ｈ］', '当庭', '将近', '却', '［③ｄ］', '除去', '穷年累月', '不怎么', '［⑦］', '表明', '各地', '另外', '谨', '来自', '伟大', '来看', '以前', '共总', '确定', '不时', '大量', '还是', '哇', '难道说', '∈［', '其实', '［⑤］］', '就是说', '［＊］', '个别', '［③ｈ］', '本着', '要么', '那儿', '从优', '安全', '此次', '乌乎', '按说', '其余', '理应', '过', '避免', '其后', '非常', '突出', '庶乎', '拿', '不可', '川流不息', '［②Ｂ］', 'Ⅲ', '替', '依', '最好', '上下', '累年', '大', '紧接着', '乘虚', '的话', '一边', 'Ｒ．Ｌ．', '极为', '看到', '９', '甫', '＜', '让', '至若', '乎', '以致', '广大', '就是了', '［⑤ａ］', '不经意', '失去', '若', '［］', '当着', '『', '多多益善', '忽地', '打从', '有的是', '非但', '吱', '要不', '她', '况且', '组成', '各人', '极', '不下', '今後', '啊哟', '趁', '归根结底', '突然', '路经', '傥然', '你们', '那些', '4', '}', '根据', '［②Ｇ］', '阿', '如其', '由是', '至今', '乘', '这么', '｜', '出', '赶早不赶晚', '反倒是', '内', '三', '＿', '否则', '兼之', '冲', '一些', '整个', '［①⑨］', '刚', '０：２', '其', '不了', '用来', '竟', '自己', '唯有', '理该', '不然的话', '诸', '^', '倘使', '因了', '余外', '日见', '能够', '［⑥］', '任凭', '而言', '我的', '专门', '后', '＊', '何苦', '清楚', '总之', '≈', '以上', '本地', '默默地', '企图', 'sub', '届时', '多数', '特殊', '根本', '完成', '很', '较', '嗬', '［②］', '具体', '处处', 'Lex', '移动', '［④ａ］', '［③⑩］', '抽冷子', '２', '即是说', '更加', '零', '［①ｃ］', '亲自', '总的来说', '实际', '得天独厚', '→', '却不', '呜呼', '=', '~', '相同', '不妨', '能否', '〈', '归齐', '６', '十分', '［③ｃ］', '不管', '尔后', '是的', '任何', '决定', '↑', '①', '二话没说', '又及', '［④ｃ］', '凑巧', '哼', '哗啦', '鄙人', '传说', '...', '很多', '完全', '待', '特别是', '除', '呃', '反过来说', '［⑧］', '顷刻', '今后', '莫', '白', '不得了', '的', '已经', '齐', '自各儿', '从事', '就算', '什么样', '按', '只', '隔日', '望', '据说', '来讲', '比方', '－', '连', '［①⑥］', '下', '即将', '怕', '难怪', '譬如', '哪天', '无论', '罢了', 'φ', '直到', '日臻', '乘胜', '接连不断', '是以', '以後', '不由得', '“', '方能', '看出', '由于', '分头', '取道', '屡屡', '率尔', '［－', '从此', '正常', '．', '合理', '权时', '谁知', '对方', '￥', '不消', '逐渐', '每每', '当前', '■', 'γ', '当头', '说明', 'φ．', '即使', '不同', '隔夜', '［④ｄ］', '造成', '既然', '依照', '…', '－β', '因', '哩', '为什么', '犹自', '到处', '［②①］', '尽心尽力', '本', '如常', '特点', '如是', '对应', '借', '第', '便', '如若', '下来', '开展', '＝［', '［①⑧］', '—', '有时', '连连', '大张旗鼓', '除此而外', '哎哟', '-', '焉', '尤其', '引起', '如上', '漫说', '绝顶', '继而', '立即', '［①Ｅ］', '差一点', '使得', '将', '不仅...而且', '大批', '奈', '必将', '怎', '一旦', '！', '咋', '倍感', '由', '转变', '问题', '不尽然', '又', '可能', '然而', '极了', '＇', '全都', '它的', '可', '默然', '几', '竟然', '与其', '奋勇', '极端', '殆', '长话短说', '莫非', '因着', '人民', '哪样', '挨着', '若是', '［②ｉ］', '光是', '尽心竭力', '满足', '说来', '从古到今', '《', '呵呵', '何止', '还', '×', '［②②］', '叮咚', '给', '分别', '尽快', '）', '它', '除开', '全面', '良好', '差不多', '不对', '重要', '单纯', '（', '哈', '看见', '只是', '少数', '之类', '……', '惟其', '另', '暗中', '基本', '凡', '猛然', '万一', '比照', '不已', '高兴', '动辄', '他的', '︿', '］［', '＋', '》', '2', '二', '呵', '原来', '②', '活', '总是', '待到', '例如', '继续', '嗡', '风雨无阻', '’‘', '进入', '局外', '彼', '屡次', '怎麽', '；', '多年前', '谁人', '且', '眨眼', '一番', '不再', '大力', '倍加', '全力', '”', '你的', '到底', '看样子', '［①④］', '最大', '再者', '只当', '彻底', '更为', '扑通', '明显', '或', '则甚', '准备', '各式', 'ｃ］', '#', '不过', '防止', '和', '小', '前进', '［②ｆ］', '以外', '』', '前者', '之后', '不惟', '而是', '多亏', '反倒', '可是', '放量', '没奈何', '集中', '＝｛', '呜', '老是', '中小', '故而', '主要', '极其', '连袂', '经常', '为什麽', '弗', '适当', '九', '比', '种', '保险', '有的', '其他', '综上所述', '这么些', '［①Ｄ］', '别人', '她是', '按时', '甚而', '哪些', '後来', '广泛', '屡', '现在', '恐怕', '历', '不只', '大不了', '总结', '沿', '但', '及时', '遵照', '今', '宁', '＄', '〕〔', '４', '方才', '已矣', '也罢', '分期分批', '据此', '目前', '反而', '临到', '日益', '不仅仅是', '认识', '｛', '恍然', '－－', '之所以', '无', '从早到晚', '⑤', '不如', '二话不说', '?', '强调', '它们的', '当即', '......', '/', '恰如', '别的', '⑩', '即刻', '往往', '嘘', '不是', '＋ξ', '［③①］', '”，', '同样', '串行', '换句话说', '自个儿', '坚持', '不得', '顷刻之间', '双方', '纵令', ']', '据', '］∧′＝［', '加之', '>>', '旁人', '先生', '别是', '古来', '如期', '敢', '才能', '有及', 'ｅ］', '那边', '［②', '这儿', '多多少少', '下去', '为', '［①⑦］', '附近', '敞开儿', '沙沙', '惯常', '＝☆', '互', '哪儿', '遵循', '首先', '云云', '别', '不巧', '1', '保管', '敢情', '今天', '挨个', '您们', '蛮', '但愿', '他', '动不动', '从新', '说说', '梆', '全身心', '［①ｄ］', '好的', '［①ａ］', '［①ｇ］', '怎么样', '孰料', '没', '有着', '觉得', '嗳', '亲身', '多', '呗', '个人', '纵使', '四', '似的', '岂', '于', '哪个', '［①Ａ］', '--', '故此', '一面', '这时', '相似', '充分', '＃', '上面', '才', '之前', '许多', '岂非', '所有', '伙同', '不够', '以期', '凭', '再说', '喀', '其二', '大事', '矣乎', '应该', '倘', '尽可能', '像', '某', '结合', '非特', '毫无例外', '尽管', '当儿', '相等', '何况', '一天', '即若', '过于', '注意', '以至于', '如同', '0', '咱们', '嘿嘿', '尽然', '促进', '挨门挨户', '::', '采取', '叮当', '看看', '这会儿', '──', '这次', '窃', '赶快', '距', '诸位', '吓', '不止一次', '白白', '岂但', '据称', '此外', '今年', '，', '二来', '表示', '除此', '.', '唉', '＝', ';', '上去', '它是', '针对', '元／吨', '具有', '存在', '因而', '把', '这样', '那样', '各个', '如此等等', '因此', '毕竟', '在下', '呼哧', '迫于', '这麽', '靠', '鉴于', '［①ｅ］', '处理', '任务', '断然', '５', '决非', '左右', '８', '普通', '难道', '［②ｊ］', '设使', '从宽', '儿', '并无', '起见', '归根到底', 'ｎｇ昉', '所幸', '朝', '普遍', '喽', '第二', '得', '乘机', '进步', '%', '以来', '更', '同一', '相对而言', '长期以来', '：', '其次', '马上', '大抵', '宣布', '如', '一时', '恰恰', '产生', '何', '得到', '去', '譬喻', '略微', '［⑩］', '联袂', '不大', '」', '或曰', '哪里', '顷', '且说', '比及', '是', '多年来', '不仅仅', '比较', '不得不', '得了', '被', '将要', '那个', '暗地里', '如下', '但凡', '大约', '论说', '常常', '啷当', '［⑤ｆ］', '拦腰', '㈧', '还有', '以便', '近几年来', '各种', '几度', '以', '反映', '啊', '此地', '即令', 'exp', '替代', '此', '他人', '陡然', '些', '分期', '诚如', '有著', '打', '末##末', '以为', '咳', '方面', '［③ｇ］', '全体', '我是', '练习', '赖以', '偶尔', '策略地', '所谓', '对于', '当中', '别管', '［②④', '欢迎', '＜Δ', '://', '真是', '全年', '［④］', '先後', '之', '而', '哎', '传闻', '简而言之', '联系', '进来', '有效', '&', '常言说得好', '@', '不可抗拒', '您', 'μ', '换言之', '大多数', '［③Ｆ］', '极力', '并没有', '而后', '"', '适应', '匆匆', '近来', '边', '或者', '见', '跟', '后面', '呀', 'Ψ', '大致', '＆', '便于', '必', '直接', '达旦', '半', '尽量', '她的', '甚么', '及', '∪φ∈', '不起', '得起', '［②③］', '诸如', '哟', '［①③］', '慢说', '强烈', '———', '′｜', '——', '心里', '按理', '大举', '了解', '来不及', '当地', '然后', '刚好', '莫若', '嘎登', "'", '也好', '这', '＋＋', '②ｃ', '彼时', '类如', '非独', '此时', '出于', '要', '嘛', '长线', '仅', '公然', '切勿', '互相', '哦', '倘若', '毫不', '另悉', '起首', '如此', '如何', '只有', '略', '～＋', '嘎嘎', '何乐而不为', '那末', '仅仅', '一致', '当然', '啊呀', '仍', '致', '难说', '忽然', '不尽', '但是', '么', '怪', '若非', '如次', '⑥', '当真', '嘿', '6', '上述', '［', '～±', '某某', '那般', '三番五次', '比起', '自家', '倒不如说', '从速', '介于', '不特', 'Δ', '嘎', '而又', ':', '不怕', '不外乎', '于是', '加入', '不日', '也就是说', '经', '岂止', '猛然间', '决不', '常言道', '倒是', '往', '［①ｆ］', '仍然', '总而言之', '粗', '砰', '谁', '要不是', '这点', '…………………………………………………③', '争取', '喂', '并不是', '人家', '除却', '再次', '［①Ｃ］', '人们', '随著', '咧', '从', '各自', '中间', '出来', '乃至', '八成', '部分', '⑦', '要不然', '到', '用', '为了', '上升', '.日', ')', '然', '另一个', '多么', '从而', '？', '趁便', '’', '几番', '居然', '１', '果真', '随后', '其一', '假若', '豁然', '只要', '勃然', '［①①］', '或许', './', '不得已', '不力', '.一', '有关', '为止', '三天两头', '［⑨］', '并没', '｛－', '什麽', '这般', '具体来说', '极度', '［⑤］', '可以', '那会儿', '来说', '尽如人意', '只怕', '⑧', '若果', '作为', '必定', '也是', '为着', '［②ｄ］', '［③ｂ］', '此间', '弹指之间', '则', '大凡', '起', '一次', '不光', '亦', '以下', '兮', '并', '而况', '[', '适用', '显著', '与其说', '什么', '倘或', '各位', '会', '认为', '还要', '临', '起头', '依靠', '任', '取得', '呕', '这个', '为何', '［①ｉ］', '不比', '从头', '到目前为止', '立马', '随', '这些', '嗯', '嗡嗡', '多少', '难得', '每年', '自身', '加强', '虽说', '［③ｅ］', 'A', '基本上', '格外', '哪怕', '×××', '③', '从不', '不要', '交口', '在于', '立', '重大', '彻夜', '乘势', '亲口', '以故', '一转眼', '℃', '不可开交', '矣', '行为', '反之', '除此以外', '宁可', '现代', '理当', '以免', '啪达', '由此可见', '不敢', '起来', '较比', '何必', '照', '另方面', '朝着', '将才', '着呢', '管', '无法', '不', '恰巧', '）÷（１－', '哼唷', '到头来', '偶而', '诚然', '为主', '一起', '地', '屡次三番', '始而', '者', '长此下去', '按期', '上', '社会主义', '纵然', '变成', '后者', '形成', '遭到', '~~~~', 'ＬＩ', '代替', '范围', '｝＞', '何须', '间或', '随着', '绝对', 'sup', '７', '这一来', '|', '不至于', '不常', '此处', '凭借', '犹且', '到头', '某些', '精光', '当口儿', '显然', '顶多', '对', '再其次', '不足', '加以', '以至', 'ｂ］', '最後', '相反', '那么样', '曾', '。', '即或', '尽', '背地里', '趁热', '汝', '通过', '你是', '再', '相信', '不断', '一直', '然後', '同', '一切', '存心', '除此之外', '.数', '开始', '巴巴', '不定', '既往', '可好', '吧', '简直', '′∈', '▲', '使', '啦', '不能', '不成', '＜＜', '背靠背', '来', '同时', '相应', '了', '如上所述', '他是', '纯粹', '假使', '哪年', '２．３％', '满', '尔', '）、', '－［＊］－', '怎么办', '虽然', '＠', '大略', '先后', '召开', '转贴', '０', '达到', '，也', '固然', '不择手段', '不料', '非徒', '由此', '［②ａ］', '亲手', '截至', '矣哉', '出现', '//', '牢牢', '一来', '以后', '故意', '谁料', '或是', '［③ａ］', '迅速', '等到', '哉', '巨大', '然则', '甚至于', '似乎', '都', '照着', '纵', ',', '逢', '里面', '叫做', '一一', '积极', '不拘', '〉', '不变', '!', '日渐', '从重', 'ｆ］', '不外', '也', '设或', '不仅', '获得', '基于', '要求', '上来', '欤', '及至', '对比', '［②⑥］', '尚且', '较为', '［①ｏ］', '经过', '立地', '大体上', '必须', '从轻', '5', '己', '有点', '必要', '不单', '叫', '起初', '最后', '［⑤ｅ］', '其它', '该', '不能不', '不论', '［②⑧］', '沿着', '起先', '后来', '立时', '属于', '略加', '到了儿', '怪不得', '就是', '老老实实', '是否', '知道', '继之', '趁势', '甚至', '运用', '丰富', '趁机', '凡是', '进行', '＝－', '几经', '并不', '｝', '非得', '均', '必然', '即如', '初', '每当', '认真', '他们', '三番两次', '结果', '与', '独自', '／', '举行', '人', '饱', '前后', '几乎', '最高', '１．', '大都', '如前所述', '8', '常言说', '不止', '据我所知', '此后', '毋宁', '独', '比如', '够瞧的', '俺', '老大', '不但', '成心', '受到', '若夫', '恰好', '至', '当场', '［②ｃ］', '六', '限制', '先不先', '总的来看', '趁早', '成年累月', '尔尔', '立刻', '啊哈', '乒', '相当', '好在', '瑟瑟', '各', '一个', '$', '不迭', '再有', '趁着', '呆呆地', '两者', '大面儿上', '越是', '喔唷', '既是', '前此', '即', '‘', '一则', '好', '不但...而且', '尽早', '从古至今', '何以', '她们', '带', '［①］', '甚或', '［②ｂ］', '较之', '考虑', '这么样', '等等', '＜λ', '陈年', '】', '本人', '咦', '借此', '7', '那么些', '容易', '每', '呐', '自打', '切不可', '那时', '所在', '高低', '虽', '老', '倘然', '连日', '啥', '急匆匆', '一样', '意思', '一方面', '竟而', '绝非', '咚', '暗自', '反过来', '有所', '概', '般的', '当', '那么', '可见', '吗', 'ＺＸＦＩＴＬ', '连同', '切切', '密切', '平素', '并肩', '得出', '进而', '顷刻间', '仍旧', '何尝', '共', '愤然', '曾经', '恰恰相反', '看上去', '反之则', '呼啦', '［②ｇ］', '七', '俺们', '借以', '能', '轰然', '话说', '》），', '除非', '别说', '一下', '颇', '接著', '全部', '单单', '恰似', '帮助', '真正', '战斗', '＜φ', '+', '哪边', '五'}
+ 
+ 
+df2 = df[["user_screen_name","account_language","account_creation_date","follower_count",
+          "following_count","tweet_time", "tweet_text"]]
+df2.head()
+user_screen_name	account_language	account_creation_date	follower_count	following_count	tweet_time	tweet_text
+0	bxJj6YkM0VJO9p7DCgvAr6cONFlVPqEs0xTI9GN4U=	en	2019-11-24	2	20	2019-12-12 01:56	郭瘟鬼这个大骗子，打着换汇的幌子通过他的地下钱庄骗钱，张口就来，每天就是在炫耀自己的骗术，殊不知大家不过是在看小丑表演罢了，当诈骗犯郭瘟鬼的骗术到如今的地步，他连自己都一起骗了，整日活在自己的骗术世界里，等待着他的终归是法律的审判。 #郭文贵 https://t.co/cpcedj5WhC
+1	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	zh-cn	2019-12-10	43	35	2020-01-06 06:05	https://t.co/hNm6nUAiE3
+2	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	zh-cn	2019-12-10	43	35	2020-01-07 10:52	https://t.co/UKuYfubjgh
+3	wUM3xcnXFbFPJHCO103DLLsCZfiGZbspt7rgmNnu2Q=	en	2020-01-03	35	75	2020-01-06 01:24	https://t.co/KtpavahflW
+4	NnQLYb8S3Wth8rhVmxeLCChy0x3TWAt6kEpm0OxpM=	en	2019-10-23	24	0	2019-11-05 00:59	秋 https://t.co/36ISekYyC9
+### Process Data
+import re
+df2["urls"] = df2.tweet_text.apply(lambda x: re.findall("https://[A-Za-z0-9\./_]+", x))
+df2["user_mentions"] = df2.tweet_text.apply(lambda x: re.findall("@[A-Za-z0-9_]+", x))
+df2["hashtags"] = df2.tweet_text.apply(lambda x: re.findall("#[A-Za-z0-9_]+", x))
+<ipython-input-8-050dfba674cb>:2: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df2["urls"] = df2.tweet_text.apply(lambda x: re.findall("https://[A-Za-z0-9\./_]+", x))
+<ipython-input-8-050dfba674cb>:3: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df2["user_mentions"] = df2.tweet_text.apply(lambda x: re.findall("@[A-Za-z0-9_]+", x))
+<ipython-input-8-050dfba674cb>:4: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df2["hashtags"] = df2.tweet_text.apply(lambda x: re.findall("#[A-Za-z0-9_]+", x))
+df2.head(3)
+user_screen_name	account_language	account_creation_date	follower_count	following_count	tweet_time	tweet_text	urls	user_mentions	hashtags
+0	bxJj6YkM0VJO9p7DCgvAr6cONFlVPqEs0xTI9GN4U=	en	2019-11-24	2	20	2019-12-12 01:56	郭瘟鬼这个大骗子，打着换汇的幌子通过他的地下钱庄骗钱，张口就来，每天就是在炫耀自己的骗术，殊不知大家不过是在看小丑表演罢了，当诈骗犯郭瘟鬼的骗术到如今的地步，他连自己都一起骗了，整日活在自己的骗术世界里，等待着他的终归是法律的审判。 #郭文贵 https://t.co/cpcedj5WhC	[https://t.co/cpcedj5WhC]	[]	[]
+1	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	zh-cn	2019-12-10	43	35	2020-01-06 06:05	https://t.co/hNm6nUAiE3	[https://t.co/hNm6nUAiE3]	[]	[]
+2	LEN1D2bgSrc+NjYIjQK5o1Aa+5amIIR3cqeiclMc=	zh-cn	2019-12-10	43	35	2020-01-07 10:52	https://t.co/UKuYfubjgh	[https://t.co/UKuYfubjgh]	[]	[]
+Analyzing Tweets By User With Most English Tweet Posts
+User with most English Tweets
+tweets_by_user_en = df[(df.userid == "ieM8Dq7qdprgaDUfE8QbnkMfBpG0GTz2A1hdYfx4R8=")]
+tweets_by_user_en = tweets_by_user_en[(tweets_by_user_en.tweet_language == "en")]
+tweets_by_user_en.head()
+tweetid	userid	user_display_name	user_screen_name	user_reported_location	user_profile_description	user_profile_url	follower_count	following_count	account_creation_date	...	retweet_tweetid	latitude	longitude	quote_count	reply_count	like_count	retweet_count	hashtags	urls	user_mentions
+2418	1137754935792164865	ieM8Dq7qdprgaDUfE8QbnkMfBpG0GTz2A1hdYfx4R8=	ieM8Dq7qdprgaDUfE8QbnkMfBpG0GTz2A1hdYfx4R8=	ieM8Dq7qdprgaDUfE8QbnkMfBpG0GTz2A1hdYfx4R8=	NaN	придлагаю новый зароботок в BannersApp на просмотре рикламы без вложения и продаж просто смотрим картинки 15 раз в час и 150 банеров в сутки🤗🤗	NaN	446	1041	2019-02-15	...	NaN	absent	absent	0	0	0	0	[]	['https://blog.coinclaim.io/wp-content/uploads/2018/12/social50.png']	[]
+2419	1144295537413435393	ieM8Dq7qdprgaDUfE8QbnkMfBpG0GTz2A1hdYfx4R8=	ieM8Dq7qdprgaDUfE8QbnkMfBpG0GTz2A1hdYfx4R8=	ieM8Dq7qdprgaDUfE8QbnkMfBpG0GTz2A1hdYfx4R8=	NaN	придлагаю новый зароботок в BannersApp на просмотре рикламы без вложения и продаж просто смотрим картинки 15 раз в час и 150 банеров в сутки🤗🤗	NaN	446	1041	2019-02-15	...	1.126804e+18	absent	absent	0	0	0	0	['Bitherplatform', 'PoW']	[]	['913719591204945920']
+3427	1106825734167937024	ieM8Dq7qdprgaDUfE8QbnkMfBpG0GTz2A1hdYfx4R8=	ieM8Dq7qdprgaDUfE8QbnkMfBpG0GTz2A1hdYfx4R8=	ieM8Dq7qdprgaDUfE8QbnkMfBpG0GTz2A1hdYfx4R8=	NaN	придлагаю новый зароботок в BannersApp на просмотре рикламы без вложения и продаж просто смотрим картинки 15 раз в час и 150 банеров в сутки🤗🤗	NaN	446	1041	2019-02-15	...	NaN	absent	absent	0	0	0	0	['Cryptocurrency', 'Giveaway', 'Contest']	['https://t.me/evaoi', 'https://evoai.marchantmarketing.com/9434/6898357']	['1009882487286267905', '743375235307675648']
+10027	1143403370146869249	ieM8Dq7qdprgaDUfE8QbnkMfBpG0GTz2A1hdYfx4R8=	ieM8Dq7qdprgaDUfE8QbnkMfBpG0GTz2A1hdYfx4R8=	ieM8Dq7qdprgaDUfE8QbnkMfBpG0GTz2A1hdYfx4R8=	NaN	придлагаю новый зароботок в BannersApp на просмотре рикламы без вложения и продаж просто смотрим картинки 15 раз в час и 150 банеров в сутки🤗🤗	NaN	446	1041	2019-02-15	...	NaN	absent	absent	0	0	0	0	['airdrop']	['http://bitroom.io', 'http://t.me/Bitroom_Airdrop_Bot', 'https://bit.ly/2xdLpI9']	[]
+11040	1137755174552965122	ieM8Dq7qdprgaDUfE8QbnkMfBpG0GTz2A1hdYfx4R8=	ieM8Dq7qdprgaDUfE8QbnkMfBpG0GTz2A1hdYfx4R8=	ieM8Dq7qdprgaDUfE8QbnkMfBpG0GTz2A1hdYfx4R8=	NaN	придлагаю новый зароботок в BannersApp на просмотре рикламы без вложения и продаж просто смотрим картинки 15 раз в час и 150 банеров в сутки🤗🤗	NaN	446	1041	2019-02-15	...	NaN	absent	absent	0	0	0	0	[]	['https://blog.coinclaim.io/50-bonus-on-clm-token/']	[]
+5 rows × 30 columns
+
+### Process the tweets.  Clean the data
+def ReviewsPreprocessing(text): 
+    # get lowercase
+    text = text.lower()
+    # remove numbers    # remove numbers
+
+    text = re.sub(r'\d+', '', text)
+    # remove urls
+    text = re.sub(r'^https?:\/\/.*[\r\n]*', '', text)
+    # remove punctuation
+    text = text.translate(text.maketrans('', '', string.punctuation))
+    # strip whitespace
+    text = text.strip()
+    # remove stop words
+    stop_words = stopwords.words('english')
+    newStopWords = ['html','yet', '’', '``', '…', '...', "''", '‘', '“', '”', "'m", "'re", "'s", "'ve", 'amp', 'https', "n't", 'rt', 
+                   'a…', 'co', 'i…','itâ€™s', 'â€\x9d', 'one', 'could','would', 'also', 'â€', 'said', '—', 'itâ', 'new',
+                  'get', 'say', 'way', 'day', 'ca', 'many', 'get', 'like', 'end', 'gtv', 'go', 'https']
+    stop_words.extend(newStopWords)
+    stop_words = set(stop_words)
+    tokens = word_tokenize(text)
+    words = [w for w in tokens if not w in stop_words]
+    text = " ".join(w for w in words)
+    text = text.replace('thisway', 'this way')
+    text = text.replace('figures', 'figure')
+    text = text.replace('hong kong', 'hongkong')
+
+    return text
+posts = tweets_by_user_en.tweet_text.values
+# preprocess posts
+processed_posts = [ReviewsPreprocessing(text) for text in posts]
+# Find frequent words and Generate word and frequency list
+vectorizer = CountVectorizer(stop_words='english', lowercase = True) 
+# Now X is the document-term matrix. 
+x = vectorizer.fit_transform(processed_posts)
+sum_words = x.sum(axis=0) 
+words_freq = [(word, sum_words[0, idx]) for word, idx in vectorizer.vocabulary_.items()]
+words_freq =sorted(words_freq, key = lambda x: x[1], reverse=True)
+words_freq[:20]
+[('ppbb', 188),
+ ('digifinex', 179),
+ ('trading', 103),
+ ('blockchain', 101),
+ ('crypto', 91),
+ ('milesguo', 80),
+ ('exratesme', 79),
+ ('token', 78),
+ ('郭文贵', 76),
+ ('ppbbio', 74),
+ ('bitsocialrobot', 71),
+ ('nakamotojedi', 71),
+ ('dear', 67),
+ ('cryptocurrency', 62),
+ ('coin', 58),
+ ('today', 57),
+ ('read', 56),
+ ('users', 53),
+ ('listed', 52),
+ ('香港', 52)]
+words_in_post = [post.lower().split() for post in processed_posts]
+posts = [[word for word in post_words] for post_words in words_in_post]
+# Create list of lists containing bigrams in posts
+terms_bigram = [list(bigrams(post)) for post in posts]
+Bi-grams to analyze how the user is tweeting
+terms_bigram[0]
+[('check', 'httpstcoolimqirqp')]
+bigrams = list(itertools.chain(*terms_bigram))
+
+
+bigram_counts = collections.Counter(bigrams)
+
+bigram_df = pd.DataFrame(bigram_counts.most_common(20),columns=['bigram', 'count'])
+bigram_df
+bigram	count
+0	(郭文贵, milesguo)	57
+1	(localtradecc, 🔺)	44
+2	(bitsocialrobot, dear)	37
+3	(digifinex, digifinex)	32
+4	(dear, users)	21
+5	(🔺, listing)	18
+6	(listed, ppbb)	18
+7	(listed, localtrade)	17
+8	(edc, blockchain)	16
+9	(ppbb, read)	15
+10	(digifinex, crypto)	14
+11	(bonusexpress, casino)	14
+12	(casino, httpstcoxfanax)	14
+13	(digifinex, going)	13
+14	(crypto, daily)	13
+15	(dear, friends)	12
+16	(going, list)	12
+17	(available, ppbb)	12
+18	(deposit, opens)	11
+19	(ppbb, trade)	11
+### Seems to be a lot of spam and information on crypto currency.
+### Unrelated to the initiatives and key topics within the data set
